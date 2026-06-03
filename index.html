@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nuclear AIMA · Centro de Comando</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <div class="sidebar-logo">NA</div>
+      <div class="sidebar-brand-text">
+        <span class="brand-name">Nuclear AIMA</span>
+        <span class="brand-sub">Centro de Comando</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+      <button class="nav-item active" data-section="dashboard" onclick="navigateTo('dashboard')">
+        <span class="nav-icon">📊</span> Dashboard
+      </button>
+      <button class="nav-item" data-section="masterplan" onclick="navigateTo('masterplan')">
+        <span class="nav-icon">📚</span> Master Plan
+        <span class="nav-badge">18</span>
+      </button>
+      <button class="nav-item" data-section="cotizador" onclick="navigateTo('cotizador')">
+        <span class="nav-icon">💰</span> Cotizador
+      </button>
+
+      <div class="nav-section-label">Herramientas</div>
+      <button class="nav-item" data-section="tools" onclick="navigateTo('tools')">
+        <span class="nav-icon">🛠️</span> Tools
+        <span class="nav-badge">2</span>
+      </button>
+
+      <div class="nav-section-label">Sistema</div>
+      <button class="nav-item" data-section="admin" onclick="navigateTo('admin')">
+        <span class="nav-icon">⚙️</span> Admin
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div style="font-size:10px;color:var(--muted2);text-align:center;line-height:1.4;">
+        Nuclear AIMA v1.0<br>
+        <span style="font-size:9px;">Ramón Orlando · 2026</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+        <span class="topo-bar-title" id="topbar-title">Dashboard</span>
+        <span class="topo-bar-breadcrumb" id="topbar-breadcrumb">Resumen general</span>
+      </div>
+      <div class="topbar-right">
+        <span id="topbar-status" style="font-size:11px;color:var(--muted);"></span>
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <div class="page-content">
+
+      <!-- ═══ DASHBOARD ═══ -->
+      <div class="section active" id="section-dashboard">
+        <div class="page-header">
+          <h1>Dashboard</h1>
+          <p>Resumen general del sistema Nuclear AIMA</p>
+        </div>
+
+        <!-- ═══ CHECKLIST REMINDER BANNER ═══ -->
+        <div id="checklist-reminder" style="display:none;margin-bottom:12px;padding:10px 16px;background:rgba(224,184,92,0.08);border:0.5px solid rgba(224,184,92,0.2);border-radius:var(--radius2);font-size:12px;color:var(--text2);line-height:1.5;cursor:pointer;transition:background 0.15s;" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('checklist'),100)" title="Haz clic para ir a la Checklist">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-size:16px;">⏰</span>
+            <div style="flex:1;">
+              <strong style="color:var(--warning);">Recordatorio:</strong>
+              <span id="checklist-reminder-text">No has marcado avance en la checklist.</span>
+            </div>
+            <span style="font-size:10px;color:var(--muted2);white-space:nowrap;">Haz clic →</span>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📚</div>
+            <div class="stat-label">Secciones Master Plan</div>
+            <div class="stat-value">18</div>
+            <div class="stat-sub">Plan completo documentado</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-label">Servicios Cotizador</div>
+            <div class="stat-value">46</div>
+            <div class="stat-sub">Precios actualizados</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🛠️</div>
+            <div class="stat-label">Herramientas</div>
+            <div class="stat-value">2</div>
+            <div class="stat-sub">Shadow Audit · Copy Generator</div>
+          </div>
+          <div class="stat-card" onclick="navigateTo('admin')" style="cursor:pointer;">
+            <div class="stat-icon">🔑</div>
+            <div class="stat-label">Clave maestra</div>
+            <div class="stat-value" id="dash-key-count" style="font-size:18px;">1</div>
+            <div class="stat-sub">Clave única — haz clic para ver</div>
+          </div>
+          <div class="stat-card" id="dash-checklist-card" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('checklist'),100)" style="cursor:pointer;">
+            <div class="stat-icon" style="background:rgba(76,173,124,0.12);">✅</div>
+            <div class="stat-label">Checklist Believe / The Orchard</div>
+            <div class="stat-value" id="dash-checklist-count" style="font-size:22px;">0/20</div>
+            <div class="stat-sub" id="dash-checklist-sub">Cargando...</div>
+            <div style="margin-top:10px;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;">
+              <div id="dash-checklist-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#4cad7c,#6ecfa5);border-radius:2px;transition:width 0.4s ease-out;"></div>
+            </div>
+          </div>
+          <div class="stat-card stat-card-fugitive" onclick="showFugitiveBreakdown()" title="Haz clic para ver el desglose por canción" style="border-color:rgba(224,92,92,0.3);position:relative;overflow:hidden;cursor:pointer;">
+            <div class="stat-icon" style="background:rgba(224,92,92,0.15);">📈</div>
+            <div class="stat-label">Reproducciones Fugadas · Ramón Orlando</div>
+            <div class="stat-value" id="dash-fugitive-views" style="color:#e05c5c;font-size:20px;">491.00M</div>
+            <div class="stat-sub">
+              <span id="dash-fugitive-money" style="color:#e05c5c;font-weight:700;">$19,640</span> perdidos este mes
+            </div>
+            <div id="dash-fugitive-rate" style="font-size:10px;color:var(--muted);margin-top:3px;">🔴 83 vistas/seg</div>
+            <div id="dash-fugitive-session" style="font-size:9px;color:var(--muted2);margin-top:1px;"></div>
+
+            <div class="income-chart">
+              <div class="bar-row">
+                <span class="bar-label">Actual <span style="color:#e05c5c;">$0</span></span>
+                <span class="bar-track"><span class="bar-fill bar-fill-actual" style="width:0%;"></span></span>
+              </div>
+              <div class="bar-row">
+                <span class="bar-label">Proyectado <span style="color:#6ecfa5;">$19,640/mes</span></span>
+                <span class="bar-track"><span class="bar-fill bar-fill-projected" style="width:0%;"></span></span>
+              </div>
+              <div class="bar-legend">Al activar administración · 12 canciones auditadas</div>
+            </div>
+
+            <div style="position:absolute;top:0;left:0;font-size:8px;padding:2px 6px;border-radius:8px 0 8px 0;cursor:pointer;color:var(--muted2);transition:color 0.15s;" onclick="event.stopPropagation();exportFugitiveReport()" title="Exportar reporte PDF" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color=''">📄 PDF</div>
+            <div class="live-badge" style="position:absolute;top:0;right:0;font-size:9px;background:rgba(224,92,92,0.2);color:#e05c5c;padding:2px 8px;border-radius:0 8px 0 8px;font-weight:600;">🔴 EN VIVO</div>
+            <div style="position:absolute;bottom:0;right:0;font-size:8px;color:var(--muted2);padding:2px 6px;">↗️ Desglose</div>
+          </div>
+        </div>
+
+        <!-- ═══ PIPELINE: ONDA → BELIEVE → LLC ═══ -->
+        <div style="margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <h3 style="font-size:14px;font-weight:500;color:var(--muted);margin:0;">Pipeline Estratégico — Orden Exacto</h3>
+            <span style="font-size:10px;color:var(--muted2);">Haz clic en cada paso →</span>
+          </div>
+          <div class="pipeline-track">
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('ondaguia'),100)" title="Registro en la ONDA">
+              <div class="pipeline-phase" style="background:#5c8ae0;">
+                <span class="pipeline-icon">🏛️</span>
+                <span class="pipeline-label">ONDA</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('carta'),100)" title="Carta de autorización notariada">
+              <div class="pipeline-phase" style="background:#5c8ae0;">
+                <span class="pipeline-icon">📜</span>
+                <span class="pipeline-label">Carta</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('estrella'),100)" title="DistroKid: ISRCs + Content ID">
+              <div class="pipeline-phase" style="background:#5c8ae0;">
+                <span class="pipeline-icon">🎵</span>
+                <span class="pipeline-label">DistroKid</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('pitch'),100)" title="Mensaje 1: Primer contacto sin documentos">
+              <div class="pipeline-phase" style="background:#9e7de8;">
+                <span class="pipeline-icon">📧</span>
+                <span class="pipeline-label">Msj 1</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('auditoria'),100)" title="Auditoría 12 canciones principales">
+              <div class="pipeline-phase" style="background:#6ecfa5;">
+                <span class="pipeline-icon">📊</span>
+                <span class="pipeline-label">Auditoría</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('pitch'),100)" title="Mensaje 2: Con resumen ejecutivo">
+              <div class="pipeline-phase" style="background:#9e7de8;">
+                <span class="pipeline-icon">📧</span>
+                <span class="pipeline-label">Msj 2</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('ondaguia'),100)" title="Certificado ONDA en mano">
+              <div class="pipeline-phase" style="background:#e8c96e;">
+                <span class="pipeline-icon">✅</span>
+                <span class="pipeline-label">Cert. ONDA</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('pitch'),100)" title="Mensaje 3: Propuesta formal con adelanto">
+              <div class="pipeline-phase" style="background:#9e7de8;">
+                <span class="pipeline-icon">📧</span>
+                <span class="pipeline-label">Msj 3</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('pitch'),100)" title="Negociación y cierre del adelanto">
+              <div class="pipeline-phase" style="background:#e8a06e;">
+                <span class="pipeline-icon">💰</span>
+                <span class="pipeline-label">Adelanto</span>
+              </div>
+              <div class="pipeline-arrow">→</div>
+            </div>
+            <div class="pipeline-step" onclick="navigateTo('masterplan');setTimeout(()=>toggleMasterSection('tokenizacion'),100)" title="LLC Wyoming + Assignment of Rights">
+              <div class="pipeline-phase" style="background:#e8c96e;">
+                <span class="pipeline-icon">🇺🇸</span>
+                <span class="pipeline-label">LLC WY</span>
+              </div>
+            </div>
+          </div>
+          <div class="pipeline-legend">
+            <span>🔵 Fundación Legal</span>
+            <span>🟢 Auditoría</span>
+            <span>🟡 Certificación</span>
+            <span>🔶 Negociación</span>
+            <span>🟣 Comunicación</span>
+          </div>
+        </div>
+
+        <!-- Quick Access -->
+        <h3 style="font-size:14px;font-weight:500;color:var(--muted);margin-bottom:12px;">Acceso rápido</h3>
+        <div class="tools-grid">
+          <div class="tool-card" onclick="navigateTo('masterplan')">
+            <div class="tool-icon" style="background:rgba(201,169,110,0.12);color:var(--accent);">📚</div>
+            <h3>Master Plan Completo</h3>
+            <p>Ingeniería Otohits, Wiki Modular, DJs, YouTube, Prensa, Web3 y Embudo Automatizado</p>
+          </div>
+          <div class="tool-card" onclick="navigateTo('cotizador')">
+            <div class="tool-icon" style="background:rgba(76,173,124,0.12);color:var(--success);">💰</div>
+            <h3>Cotizador de Servicios</h3>
+            <p>46 servicios IG con cálculo de cantidades, cotización PDF y exportación CSV</p>
+          </div>
+          <div class="tool-card" onclick="navigateTo('tools')">
+            <div class="tool-icon" style="background:rgba(92,140,224,0.12);color:var(--info);">🛠️</div>
+            <h3>Shadow Audit</h3>
+            <p>Auditoría de catálogos musicales · Análisis de métricas y regalías</p>
+          </div>
+          <div class="tool-card" onclick="navigateTo('tools')">
+            <div class="tool-icon" style="background:rgba(224,184,92,0.12);color:var(--warning);">✍️</div>
+            <h3>Copy Generator</h3>
+            <p>Generación de textos de marketing y outreach para campañas</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ MASTER PLAN ═══ -->
+      <div class="section" id="section-masterplan">
+        <div class="page-header">
+          <h1>Master Plan</h1>
+          <p>Manual Maestro de Infraestructura Digital Nuclear AIMA · Versión 1.0 — 2026</p>
+        </div>
+        <div id="masterplan-container"></div>
+      </div>
+
+      <!-- ═══ COTIZADOR ═══ -->
+      <div class="section" id="section-cotizador">
+        <div class="page-header">
+          <h1>Cotizador</h1>
+          <p>Scaling Flow IA · Servicios de crecimiento para Instagram</p>
+        </div>
+        <div id="cotizador-container"></div>
+      </div>
+
+      <!-- ═══ TOOLS ═══ -->
+      <div class="section" id="section-tools">
+        <div class="page-header">
+          <h1>Herramientas</h1>
+          <p>Shadow Audit · Copy Generator · Más pronto</p>
+        </div>
+        <div id="tools-container"></div>
+      </div>
+
+      <!-- ═══ ADMIN ═══ -->
+      <div class="section" id="section-admin">
+        <div class="page-header">
+          <h1>Administración</h1>
+          <p>Gestión de llaves de acceso, markup de precios y configuración del sistema</p>
+        </div>
+        <div id="admin-container"></div>
+      </div>
+
+    </div><!-- /page-content -->
+  </div><!-- /main-content -->
+</div><!-- /app-layout -->
+
+<!-- ═══ LOGIN OVERLAY ═══ -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="login-logo-icon">NA</div>
+      <div class="login-logo-text">Nuclear AIMA</div>
+      <div class="login-logo-sub">Centro de Comando</div>
+    </div>
+    <div class="login-form">
+      <div class="login-error" id="login-error"></div>
+      <div class="form-group" style="margin:0;">
+        <label>Contraseña de acceso</label>
+        <input type="password" id="login-password" placeholder="••••••••" autofocus onkeydown="if(event.key==='Enter')handleLogin()" />
+      </div>
+      <button class="btn btn-primary btn-lg w-full" onclick="handleLogin()" style="margin-top:14px;justify-content:center;">
+        🔐 Acceder
+      </button>
+      <div style="font-size:10px;color:var(--muted2);text-align:center;margin-top:14px;line-height:1.5;">
+        Acceso restringido · Solo personal autorizado
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ MODAL ═══ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modal-title">Modal</h3>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="js/cotizador.js"></script>
+<script src="js/masterplan.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
