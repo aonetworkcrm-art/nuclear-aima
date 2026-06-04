@@ -27,7 +27,7 @@ let naState = {
   cpm: 1.50,
   isLoading: false,
   selectedIds: new Set(),
-  naView: 'nodes', // 'nodes' | 'pirates' | 'shorts'
+  naView: 'nodes', // 'nodes' | 'pirates' | 'shorts' | 'audioshorts'
   naSearchMode: 'song', // 'song' | 'artist'
   useRealData: false,
   apiBaseUrl: 'http://localhost:5000',
@@ -39,7 +39,16 @@ let naState = {
   shortsSortBy: 'views',
   shortsChannelFilter: 'all',
   shortsPage: 1,
-  shortsPerPage: 25
+  shortsPerPage: 25,
+  // Audio Shorts data
+  audioShorts: [],
+  audioShortsFiltered: [],
+  // Audio Shorts filter/sort state
+  audioSearch: '',
+  audioSortBy: 'views',
+  audioChannelFilter: 'all',
+  audioPage: 1,
+  audioPerPage: 25
 };
 
 /* ── Referencias globales (se resuelven al usar) ── */
@@ -240,6 +249,79 @@ function generateShortsForSong(song, count) {
 }
 
 /* ══════════════════════════════════════════════
+   GENERACIÓN DE AUDIO SHORTS (Shorts con este audio)
+   ══════════════════════════════════════════════ */
+
+function generateAudioShortsForSong(song, count) {
+  // Genera shorts mock que simulan los "Shorts con este audio"
+  // que aparecen en la página del video de YouTube.
+  const shorts = [];
+  const baseViews = song.views || 1000000;
+  const seedBase = song.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+  const actualCount = Math.min(count || 15, 30);
+
+  const audioChannelPools = [
+    ['Remix Creator 🎧', 'Music Cover', 'Audio Remix', 'Sound Studio', 'Beat Maker'],
+    ['Vocal Cover', 'Instrumental Cover', 'Remix Oficial', 'Mashup Master', 'Audio Edit'],
+    ['Cover Latino', 'Remix Dominicano', 'Sonido Pro', 'Musica Original', 'Estudio Grabación'],
+    ['Dj Mix Shorts', 'Producción Musical', 'Cover Academy', 'Audio Viral', 'Remix Factory'],
+    ['Merengue Cover', 'Bachata Remix', 'Sabor Musical', 'Ritmo Studio', 'Piano Covers']
+  ];
+
+  const audioTemplates = [
+    ' (Cover)', ' - Remix', ' 🎤 Cover Vocal', ' 🎸 Versión',
+    ' 🎧 Remix 2025', ' (Recreación)', ' 🎹 Piano Cover', ' 🎵 Versión Acústica',
+    ' 🔥 Remix', ' 🎶 Cover', ' (Audio Original)',
+    ' 🎧 con este audio', ' 🎸 Tocando', ' 🎹 Al Piano', ' 🎤 Cantando'
+  ];
+
+  for (let i = 0; i < actualCount; i++) {
+    const seed = seedBase + i * 17 + 5555;
+    const r = seededRandom(seed);
+    const rank = i + 1;
+    const viewShare = (1 / Math.pow(rank, 1.3)) /
+      Array.from({ length: actualCount }, (_, j) => 1 / Math.pow(j + 1, 1.3)).reduce((a, b) => a + b, 0);
+
+    const shortViews = Math.round(baseViews * 0.8 * viewShare);
+    const shortAgeDays = Math.round(5 + r * 200);
+    const shortAgeHours = shortAgeDays * 24;
+    const vph = shortAgeHours > 0 ? +(shortViews / shortAgeHours).toFixed(2) : 0;
+    const usdPerHour = +((vph * naState.cpm * 0.5) / 1000).toFixed(6);
+
+    const poolIdx = Math.floor(seededRandom(seed + 111) * audioChannelPools.length);
+    const pool = audioChannelPools[poolIdx];
+    const chIdx = Math.floor(seededRandom(seed + 222) * pool.length);
+    const channel = pool[chIdx];
+
+    const template = audioTemplates[Math.floor(seededRandom(seed + 333) * audioTemplates.length)];
+    const title = `${song.name}${template}`;
+
+    shorts.push({
+      id: i + 1,
+      title,
+      channel,
+      url: `https://www.youtube.com/shorts/?search_query=${encodeURIComponent(song.name + ' cover')}`,
+      views: shortViews,
+      age_days: shortAgeDays,
+      vph,
+      est_usd_per_hour: usdPerHour,
+      type: 'audio-short',
+      typeLabel: '🎵 Audio Short',
+      isPirate: false,
+      isOfficial: false,
+      isShort: true,
+      source: 'audio-shelf-mock',
+      audioSource: `https://www.youtube.com/watch?v=mock_${song.name.replace(/[^a-z]/gi, '')}`
+    });
+  }
+
+  shorts.sort((a, b) => b.views - a.views);
+  shorts.forEach((s, i) => { s.id = i + 1; });
+
+  return shorts;
+}
+
+/* ══════════════════════════════════════════════
    CONSOLIDACIÓN POR CANAL PIRATA
    ══════════════════════════════════════════════ */
 
@@ -424,6 +506,8 @@ function auditSingleSong(name, nodes, views, catId) {
   naState.filteredNodes = [...naState.nodes];
   naState.shorts = generateShortsForSong(song, 25);
   naState.shortsFiltered = [...naState.shorts];
+  naState.audioShorts = generateAudioShortsForSong(song, 15);
+  naState.audioShortsFiltered = [...naState.audioShorts];
   naState.naSearchMode = 'song';
   renderResults();
   showNodesReady(song);
@@ -459,6 +543,8 @@ function auditAllArtistSongs() {
           naState.filteredNodes = [...naState.nodes];
           naState.shorts = (data.shorts || []).map(s => ({ ...s, isShort: true }));
           naState.shortsFiltered = [...naState.shorts];
+          naState.audioShorts = (data.audio_shorts || []).map(s => ({ ...s, source: 'audio-shelf' }));
+          naState.audioShortsFiltered = [...naState.audioShorts];
           naState.targetSong = { name: toAudit.length + ' canciones del catálogo' };
           renderResults();
           showNodesReady(naState.targetSong);
@@ -506,6 +592,20 @@ function generateMockBatch(toAudit) {
   naState.filteredNodes = [...allNodes];
   naState.shorts = allShorts;
   naState.shortsFiltered = [...allShorts];
+  // Generar audio shorts mock para el batch
+  const allAudioShorts = [];
+  toAudit.forEach(s => {
+    const audioShorts = generateAudioShortsForSong(
+      { name: s.name, views: s.views || 1000000 },
+      8
+    );
+    audioShorts.forEach(sh => {
+      sh.songName = s.name;
+      allAudioShorts.push(sh);
+    });
+  });
+  naState.audioShorts = allAudioShorts;
+  naState.audioShortsFiltered = [...allAudioShorts];
   naState.targetSong = { name: toAudit.length + ' canciones de ' + (naState.targetArtist?.name || 'artista') };
   renderResults();
   showNodesReady(naState.targetSong);
@@ -539,6 +639,8 @@ function searchNodes(query, maxNodes, cpm) {
     naState.filteredNodes = [...naState.nodes];
     naState.shorts = generateShortsForSong(match, 25);
     naState.shortsFiltered = [...naState.shorts];
+    naState.audioShorts = generateAudioShortsForSong(match, 15);
+    naState.audioShortsFiltered = [...naState.audioShorts];
     renderResults();
     showNodesReady(match);
   } else {
@@ -553,6 +655,8 @@ function searchNodes(query, maxNodes, cpm) {
       naState.filteredNodes = [...naState.nodes];
       naState.shorts = generateShortsForSong(matchAudited, 25);
       naState.shortsFiltered = [...naState.shorts];
+      naState.audioShorts = generateAudioShortsForSong(matchAudited, 15);
+      naState.audioShortsFiltered = [...naState.audioShorts];
       renderResults();
       showNodesReady(matchAudited);
     } else {
@@ -570,6 +674,8 @@ function searchNodes(query, maxNodes, cpm) {
       naState.filteredNodes = [...naState.nodes];
       naState.shorts = generateShortsForSong(estimatedSong, 25);
       naState.shortsFiltered = [...naState.shorts];
+      naState.audioShorts = generateAudioShortsForSong(estimatedSong, 15);
+      naState.audioShortsFiltered = [...naState.audioShorts];
       renderResults();
       showNodesReady(estimatedSong, true);
     }
@@ -631,22 +737,30 @@ function updateSelectionUI() {
 /* ── Cambiar vista ── */
 function switchNAView(view) {
   naState.naView = view;
-  naState.shortsSearch = '';
-  naState.shortsSortBy = 'views';
-  naState.shortsChannelFilter = 'all';
-  naState.shortsPage = 1;
-  // Resetear shortsFiltered al entrar a la vista de Shorts
+  // Resetear filtros al cambiar de vista
   if (view === 'shorts') {
+    naState.shortsSearch = '';
+    naState.shortsSortBy = 'views';
+    naState.shortsChannelFilter = 'all';
+    naState.shortsPage = 1;
     naState.shortsFiltered = [...naState.shorts];
+  } else if (view === 'audioshorts') {
+    naState.audioSearch = '';
+    naState.audioSortBy = 'views';
+    naState.audioChannelFilter = 'all';
+    naState.audioPage = 1;
+    naState.audioShortsFiltered = [...naState.audioShorts];
   }
   renderResults();
   // Update tab UI
   document.querySelectorAll('.na-view-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.view === view);
   });
-  // Show/hide shorts filter bar
-  const filterBar = document.getElementById('na-shorts-filter-bar');
-  if (filterBar) filterBar.style.display = (view === 'shorts') ? 'flex' : 'none';
+  // Show/hide filter bars
+  const shortsBar = document.getElementById('na-shorts-filter-bar');
+  if (shortsBar) shortsBar.style.display = (view === 'shorts') ? 'flex' : 'none';
+  const audioBar = document.getElementById('na-audio-filter-bar');
+  if (audioBar) audioBar.style.display = (view === 'audioshorts') ? 'flex' : 'none';
 }
 
 /* ══════════════════════════════════════════════
@@ -733,6 +847,9 @@ function renderNodeAuditor() {
             <button class="na-view-tab" data-view="shorts" onclick="switchNAView('shorts')" id="na-tab-shorts">
               📱 Shorts <span id="na-tab-shorts-count" style="font-size:9px;opacity:0.7;"></span>
             </button>
+            <button class="na-view-tab" data-view="audioshorts" onclick="switchNAView('audioshorts')" id="na-tab-audioshorts">
+              🎵 Audio <span id="na-tab-audioshorts-count" style="font-size:9px;opacity:0.7;"></span>
+            </button>
           </div>
           <span id="na-nodes-info" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
           <span id="na-selection-bar" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
@@ -765,6 +882,26 @@ function renderNodeAuditor() {
         <button class="btn btn-xs btn-ghost" onclick="shortsPrevPage()" style="font-size:10px;" id="na-shorts-prev">◀</button>
         <span id="na-shorts-page-info" style="font-size:10px;color:var(--muted2);white-space:nowrap;">—</span>
         <button class="btn btn-xs btn-ghost" onclick="shortsNextPage()" style="font-size:10px;" id="na-shorts-next">▶</button>
+      </div>
+      <!-- Audio Shorts Filter Bar (hidden by default) -->
+      <div id="na-audio-filter-bar" style="display:none;padding:8px 16px;border-bottom:0.5px solid var(--border);background:rgba(110,207,165,0.04);align-items:center;gap:8px;flex-wrap:wrap;border-top:0.5px solid rgba(110,207,165,0.1);">
+        <span style="font-size:10px;color:var(--success-bright);font-weight:500;white-space:nowrap;">🎵 Shorts con este audio</span>
+        <input type="text" id="na-audio-search" placeholder="🔍 Buscar por título o canal..."
+          style="flex:1;min-width:120px;padding:6px 10px;background:var(--bg4);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;"
+          oninput="naState.audioSearch=this.value;filterAudioShorts()" />
+        <select id="na-audio-sort" style="padding:6px 10px;background:var(--bg4);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;cursor:pointer;"
+          onchange="applyAudioSort(this.value)">
+          <option value="views">👁️ Por vistas</option>
+          <option value="vph">📈 Por VPH</option>
+          <option value="date">🕐 Más recientes</option>
+        </select>
+        <select id="na-audio-channel-filter" style="padding:6px 10px;background:var(--bg4);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;cursor:pointer;max-width:160px;"
+          onchange="applyAudioChannelFilter(this.value)">
+          <option value="all">🎵 Todos los canales</option>
+        </select>
+        <button class="btn btn-xs btn-ghost" onclick="audioPrevPage()" style="font-size:10px;" id="na-audio-prev">◀</button>
+        <span id="na-audio-page-info" style="font-size:10px;color:var(--muted2);white-space:nowrap;">—</span>
+        <button class="btn btn-xs btn-ghost" onclick="audioNextPage()" style="font-size:10px;" id="na-audio-next">▶</button>
       </div>
       <div class="na-table-scroll">
         <div id="na-table-container">
@@ -850,6 +987,8 @@ function executeNodeSearch() {
           naState.filteredNodes = [...naState.nodes];
           naState.shorts = (data.shorts || []).map(s => ({ ...s, isShort: true }));
           naState.shortsFiltered = [...naState.shorts];
+          naState.audioShorts = (data.audio_shorts || []).map(s => ({ ...s, source: 'audio-shelf' }));
+          naState.audioShortsFiltered = [...naState.audioShorts];
           naState.targetSong = { name: query, nodes: data.song_info?.totalNodes || data.total };
           renderResults();
           showNodesReady(naState.targetSong, false);
@@ -885,6 +1024,8 @@ function executeNodeSearch() {
 function renderResults() {
   if (naState.naView === 'shorts') {
     renderShortsView();
+  } else if (naState.naView === 'audioshorts') {
+    renderAudioShortsView();
   } else if (naState.naView === 'pirates') {
     renderPirateView();
   } else {
@@ -982,6 +1123,8 @@ function renderNodeView() {
   document.getElementById('na-tab-pirates-count').textContent = `(${pirateCount})`;
   // Update shorts tab count
   document.getElementById('na-tab-shorts-count').textContent = `(${naState.shorts.length})`;
+  // Update audio shorts tab count
+  document.getElementById('na-tab-audioshorts-count').textContent = `(${naState.audioShorts.length})`;
 
   document.getElementById('na-export-btn').disabled = false;
   document.getElementById('na-select-all-btn').style.display = 'inline-flex';
@@ -1157,6 +1300,66 @@ function shortsNextPage() {
 }
 
 /* ══════════════════════════════════════════════
+   FILTROS DE AUDIO SHORTS
+   ══════════════════════════════════════════════ */
+
+function filterAudioShorts() {
+  const search = naState.audioSearch.toLowerCase().trim();
+  const sortBy = naState.audioSortBy;
+  const channelFilter = naState.audioChannelFilter;
+  
+  let filtered = [...naState.audioShorts];
+  
+  if (search) {
+    filtered = filtered.filter(s => 
+      s.title.toLowerCase().includes(search) || 
+      s.channel.toLowerCase().includes(search)
+    );
+  }
+  
+  if (channelFilter !== 'all') {
+    filtered = filtered.filter(s => s.channel === channelFilter);
+  }
+  
+  if (sortBy === 'views') {
+    filtered.sort((a, b) => b.views - a.views);
+  } else if (sortBy === 'vph') {
+    filtered.sort((a, b) => b.vph - a.vph);
+  } else if (sortBy === 'date') {
+    filtered.sort((a, b) => a.age_days - b.age_days);
+  }
+  
+  naState.audioShortsFiltered = filtered;
+  naState.audioPage = 1;
+  renderAudioShortsView();
+}
+
+function applyAudioSort(sortBy) {
+  naState.audioSortBy = sortBy;
+  filterAudioShorts();
+}
+
+function applyAudioChannelFilter(channel) {
+  naState.audioChannelFilter = channel;
+  filterAudioShorts();
+}
+
+function audioPrevPage() {
+  if (naState.audioPage > 1) {
+    naState.audioPage--;
+    renderAudioShortsView();
+  }
+}
+
+function audioNextPage() {
+  const maxPage = Math.ceil(naState.audioShortsFiltered.length / naState.audioPerPage);
+  if (naState.audioPage < maxPage) {
+    naState.audioPage++;
+    renderAudioShortsView();
+  }
+}
+
+/* ══════════════════════════════════════════════
    VISTA DE SHORTS VIRALES
    ══════════════════════════════════════════════ */
 
@@ -1326,6 +1529,200 @@ function renderShortsView() {
   document.getElementById('na-select-all-btn').style.display = 'none';
   document.getElementById('na-deselect-btn').style.display = 'none';
   document.getElementById('na-remove-btn').style.display = 'none';
+}
+
+/* ══════════════════════════════════════════════
+   VISTA DE AUDIO SHORTS (Shorts con este audio)
+   ══════════════════════════════════════════════ */
+
+function consolidateAudioShortsByChannel(shorts) {
+  const byChannel = {};
+  shorts.forEach(s => {
+    if (!byChannel[s.channel]) {
+      byChannel[s.channel] = {
+        channel: s.channel,
+        shorts: [],
+        totalViews: 0,
+        totalVPH: 0,
+        totalUSD: 0,
+        shortCount: 0
+      };
+    }
+    byChannel[s.channel].shorts.push(s);
+    byChannel[s.channel].totalViews += s.views;
+    byChannel[s.channel].totalVPH += s.vph;
+    byChannel[s.channel].totalUSD += s.est_usd_per_hour || 0;
+    byChannel[s.channel].shortCount++;
+  });
+  return Object.values(byChannel).sort((a, b) => b.totalViews - a.totalViews);
+}
+
+function getAudioShortsTotals(shorts) {
+  if (!shorts || shorts.length === 0) {
+    return {
+      totalShorts: 0, totalViews: 0, totalVPH: 0.0,
+      uniqueChannels: 0, totalUSD: 0, avgViewsPerShort: 0
+    };
+  }
+  return {
+    totalShorts: shorts.length,
+    totalViews: shorts.reduce((a, s) => a + s.views, 0),
+    totalVPH: shorts.reduce((a, s) => a + s.vph, 0),
+    totalUSD: shorts.reduce((a, s) => a + (s.est_usd_per_hour || 0), 0),
+    uniqueChannels: new Set(shorts.map(s => s.channel)).size,
+    avgViewsPerShort: Math.round(shorts.reduce((a, s) => a + s.views, 0) / Math.max(1, shorts.length))
+  };
+}
+
+function renderAudioShortsView() {
+  const thead = document.getElementById('na-table-head');
+  const tbody = document.getElementById('na-node-tbody');
+  const shorts = naState.audioShortsFiltered;
+  const consolidated = consolidateAudioShortsByChannel(shorts);
+  const totals = getAudioShortsTotals(shorts);
+
+  thead.innerHTML = `
+    <tr>
+      <th style="width:36px;">#</th>
+      <th style="width:170px;">Canal</th>
+      <th>Título del Short</th>
+      <th style="text-align:right;width:110px;">Vistas</th>
+      <th style="text-align:right;width:70px;">Edad</th>
+      <th style="text-align:right;width:70px;">VPH</th>
+      <th style="text-align:right;width:80px;">USD/h</th>
+      <th style="text-align:center;width:54px;">🔗</th>
+    </tr>
+  `;
+
+  if (!shorts || shorts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px 16px;color:var(--muted2);font-size:12px;">
+      🎵 No se encontraron Shorts con este audio para esta búsqueda.<br>
+      <span style="font-size:11px;color:var(--muted);">Estos Shorts usan la misma pista de audio que el video original. Aparecen cuando el backend puede extraerlos de YouTube.</span>
+    </td></tr>`;
+    updateAudioShortsMetrics(shorts);
+    document.getElementById('na-export-btn').disabled = false;
+    document.getElementById('na-select-all-btn').style.display = 'none';
+    document.getElementById('na-deselect-btn').style.display = 'none';
+    document.getElementById('na-remove-btn').style.display = 'none';
+    return;
+  }
+
+  // ── Filter Bar visible ──
+  const filterBar = document.getElementById('na-audio-filter-bar');
+  if (filterBar) filterBar.style.display = 'flex';
+  
+  // ── Poblar dropdown de canales ──
+  const channelSelect = document.getElementById('na-audio-channel-filter');
+  if (channelSelect && channelSelect.options.length <= 1) {
+    const channels = [...new Set(shorts.map(s => s.channel))].sort();
+    channels.forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch;
+      opt.textContent = `🎵 ${ch.substring(0, 30)}`;
+      channelSelect.appendChild(opt);
+    });
+  }
+  
+  // ── Paginación ──
+  const startIdx = (naState.audioPage - 1) * naState.audioPerPage;
+  const endIdx = Math.min(startIdx + naState.audioPerPage, shorts.length);
+  const pageShorts = shorts.slice(startIdx, endIdx);
+  const maxPage = Math.ceil(shorts.length / naState.audioPerPage);
+  
+  const pageInfo = document.getElementById('na-audio-page-info');
+  if (pageInfo) {
+    pageInfo.textContent = `${naState.audioPage}/${maxPage}`;
+  }
+
+  // ── Consolidado por canal en miniatura ──
+  const maxViews = consolidated.length > 0 ? consolidated[0].totalViews : 1;
+  let html = '';
+
+  html += `<tr><td colspan="8" style="padding:0;"><div style="padding:10px 14px;background:rgba(110,207,165,0.06);border-bottom:0.5px solid rgba(110,207,165,0.15);">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--muted);">🎵 <strong style="color:var(--success-bright);">${totals.totalShorts}</strong> Shorts con este audio · <strong style="color:var(--success-bright);">${totals.uniqueChannels}</strong> canales</span>
+      <span style="font-size:11px;color:var(--muted);">👁️ <strong style="color:var(--emerald);">${totals.totalViews.toLocaleString('en-US')}</strong> vistas totales</span>
+      <span style="font-size:11px;color:var(--muted);">📈 <strong style="color:var(--info-bright);">${totals.totalVPH.toFixed(1)}</strong> VPH combinado</span>
+    </div>
+    <div style="display:flex;gap:3px;height:80px;align-items:flex-end;padding:0 4px;">
+      ${consolidated.slice(0, 8).map(ch => {
+        const h = Math.max(4, (ch.totalViews / (consolidated[0]?.totalViews || 1)) * 100);
+        const color = ch.totalViews > (consolidated[0]?.totalViews || 1) * 0.5 ? 'var(--success-bright)' :
+                      ch.totalViews > (consolidated[0]?.totalViews || 1) * 0.2 ? 'var(--success)' : 'var(--muted2)';
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+          <div style="font-size:7px;color:var(--muted2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50px;text-align:center;line-height:1.2;">${ch.channel.substring(0, 6)}</div>
+          <div style="width:100%;height:${Math.round(h)}%;background:${color};border-radius:3px 3px 0 0;min-height:3px;transition:height 0.4s ease-out;" title="${ch.channel}: ${ch.totalViews.toLocaleString()} vistas"></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:8px;color:var(--muted2);margin-top:4px;text-align:center;">Top canales por vistas · Shorts que usan la misma pista de audio</div>
+  </div></td></tr>`;
+
+  // Tabla de Shorts individuales
+  pageShorts.forEach((s, i) => {
+    const ageStr = s.age_days < 30 ? Math.round(s.age_days) + ' días'
+      : Math.round(s.age_days / 30) + ' meses';
+
+    const audioBadge = s.source === 'audio-shelf' || s.source === 'audio-shelf-dynamic'
+      ? '<span style="font-size:8px;background:rgba(110,207,165,0.15);color:var(--success-bright);padding:1px 5px;border-radius:3px;font-weight:600;">🎵 AUDIO</span>'
+      : '<span style="font-size:8px;background:rgba(92,140,224,0.15);color:var(--info);padding:1px 5px;border-radius:3px;font-weight:600;">📱 SHORT</span>';
+
+    html += `
+      <tr class="na-node-row" style="background:rgba(110,207,165,0.02);">
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">${startIdx + i + 1}</td>
+        <td>
+          <div style="font-size:12px;font-weight:500;color:var(--success-bright);">🎵 ${s.channel}</div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:1px;">${audioBadge}</div>
+        </td>
+        <td>
+          <div style="font-size:12px;font-weight:500;color:var(--text2);">${s.title}</div>
+          ${s.audioSource ? `<div style="font-size:9px;color:var(--muted2);margin-top:1px;">🎬 De: ${s.audioSource.substring(0, 50)}</div>` : ''}
+        </td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:${s.views > 5000000 ? 'var(--danger)' : s.views > 1000000 ? 'var(--warning)' : 'var(--text)'};">${s.views.toLocaleString('en-US')}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);">${ageStr}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${s.vph.toFixed(2)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${(s.est_usd_per_hour || 0).toFixed(6)}</td>
+        <td style="text-align:center;">
+          <a href="${s.url}" target="_blank" class="na-node-link" title="Ver Short en YouTube">🔗</a>
+        </td>
+      </tr>
+    `;
+  });
+
+  // Totales
+  html += `
+    <tr style="background:var(--bg4);font-weight:700;">
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;padding:10px 8px;">—</td>
+      <td style="padding:10px 8px;" colspan="2"><strong style="color:var(--success-bright);">TOTAL AUDIO SHORTS</strong></td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--emerald);padding:10px 8px;">${totals.totalViews.toLocaleString('en-US')}</td>
+      <td style="text-align:right;padding:10px 8px;">—</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--info-bright);padding:10px 8px;">${totals.totalVPH.toFixed(1)}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--orange-bright);padding:10px 8px;">$${(totals.totalUSD || 0).toFixed(4)}</td>
+      <td style="text-align:center;padding:10px 8px;">—</td>
+    </tr>
+  `;
+
+  tbody.innerHTML = html;
+  updateAudioShortsMetrics(shorts);
+
+  const info = document.getElementById('na-nodes-info');
+  info.innerHTML = `<strong style="color:var(--success-bright);">${shorts.length}</strong> Shorts con este audio · <strong>${totals.uniqueChannels}</strong> canales · Mostrando ${startIdx + 1}-${endIdx}`;
+  if (maxPage > 1) {
+    info.innerHTML += ` · <span style="color:var(--muted2);">Pág ${naState.audioPage}/${maxPage}</span>`;
+  }
+
+  document.getElementById('na-export-btn').disabled = false;
+  document.getElementById('na-select-all-btn').style.display = 'none';
+  document.getElementById('na-deselect-btn').style.display = 'none';
+  document.getElementById('na-remove-btn').style.display = 'none';
+}
+
+function updateAudioShortsMetrics(shorts) {
+  const totals = getAudioShortsTotals(shorts);
+  document.getElementById('na-metric-nodes').innerHTML = `${totals.totalShorts} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">audio shorts</span>`;
+  document.getElementById('na-metric-views').innerHTML = `${totals.totalViews.toLocaleString('en-US')} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">vistas</span>`;
+  document.getElementById('na-metric-vph').innerHTML = `${totals.totalVPH.toFixed(1)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
+  document.getElementById('na-metric-usd').innerHTML = `$${(totals.totalUSD || 0).toFixed(6)} <span style="font-size:11px;font-weight:400;color:var(--success-bright);font-family:var(--font);">/h audio shorts</span>`;
 }
 
 /* ══════════════════════════════════════════════
@@ -1550,6 +1947,7 @@ function renderDonutChart(data, valueKey, labelKey, size = 180, donutWidth = 32)
 function updateMetrics(nodes) {
   if (naState.naView === 'pirates') return;
   if (naState.naView === 'shorts') return;
+  if (naState.naView === 'audioshorts') return;
   let totalViews = 0;
   let totalVPH = 0;
   let totalUSD = 0;
@@ -2024,3 +2422,11 @@ window.shortsPrevPage = shortsPrevPage;
 window.shortsNextPage = shortsNextPage;
 window.generateShortsForSong = generateShortsForSong;
 window.showShortDetail = showShortDetail;
+
+window.renderAudioShortsView = renderAudioShortsView;
+window.filterAudioShorts = filterAudioShorts;
+window.applyAudioSort = applyAudioSort;
+window.applyAudioChannelFilter = applyAudioChannelFilter;
+window.audioPrevPage = audioPrevPage;
+window.audioNextPage = audioNextPage;
+window.generateAudioShortsForSong = generateAudioShortsForSong;

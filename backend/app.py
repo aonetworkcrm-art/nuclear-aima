@@ -88,16 +88,22 @@ def audit_node():
 
     scraper = YouTubeScraper(headless=headless, timeout=20)
     try:
+        audio_shorts = []
         if include_shorts:
             result = scraper.search_song_with_shorts(query, max_nodes=max_nodes, max_shorts=max_shorts)
             nodes = result['nodes']
             shorts = result['shorts']
+            audio_shorts = result.get('audio_shorts', [])
         else:
             nodes = scraper.search_song(query, max_results=max_nodes)
             shorts = []
 
         song_info = scraper.get_song_info(nodes)
         shorts_info = scraper.get_shorts_info(shorts) if shorts else {
+            'totalShorts': 0, 'totalViews': 0, 'totalVPH': 0.0,
+            'uniqueChannels': 0, 'topChannels': [], 'avgViewsPerShort': 0
+        }
+        audio_shorts_info = scraper.get_shorts_info(audio_shorts) if audio_shorts else {
             'totalShorts': 0, 'totalViews': 0, 'totalVPH': 0.0,
             'uniqueChannels': 0, 'topChannels': [], 'avgViewsPerShort': 0
         }
@@ -108,11 +114,17 @@ def audit_node():
             n['type'] = 'pirate' if n['isPirate'] else ('official' if n['isOfficial'] else 'cover')
             n['typeLabel'] = '🏴‍☠️ Pirata' if n['isPirate'] else ('Oficial' if n['isOfficial'] else 'Cover')
 
-        # Enriquecer Shorts
+        # Enriquecer Shorts regulares
         for s in shorts:
-            s['est_usd_per_hour'] = round((s['vph'] * cpm * 0.5) / 1000, 6)  # Shorts pagan ~50%
+            s['est_usd_per_hour'] = round((s['vph'] * cpm * 0.5) / 1000, 6)
             s['type'] = 'short'
             s['typeLabel'] = '📱 Short'
+
+        # Enriquecer Shorts de audio
+        for s in audio_shorts:
+            s['est_usd_per_hour'] = round((s['vph'] * cpm * 0.5) / 1000, 6)
+            s['type'] = 'audio-short'
+            s['typeLabel'] = '🎵 Audio Short'
 
         return jsonify({
             'status': 'success',
@@ -120,11 +132,14 @@ def audit_node():
             'cpm': cpm,
             'nodes': nodes,
             'shorts': shorts,
+            'audio_shorts': audio_shorts,
             'song_info': song_info,
             'shorts_info': shorts_info,
+            'audio_shorts_info': audio_shorts_info,
             'total': len(nodes),
             'total_shorts': len(shorts),
-            'message': f'Extraídos {len(nodes)} nodos y {len(shorts)} Shorts para "{query}"'
+            'total_audio_shorts': len(audio_shorts),
+            'message': f'Extraídos {len(nodes)} nodos, {len(shorts)} Shorts y {len(audio_shorts)} Shorts de audio para "{query}"'
         })
     except Exception as e:
         logger.error(f"Error en auditoría: {e}")
