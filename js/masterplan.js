@@ -749,19 +749,25 @@ const MASTER_SECTIONS = [
   },
   {
     id: 'pitch',
-    title: '12. 📧 Pitch a Multinacionales — Los 4 Mensajes a Believe / The Orchard',
-    subtitle: 'Secuencia de comunicación profesional para asegurar el adelanto de $500K-$1M contra regalías futuras',
+    title: '12. 📧 Pitch a Multinacionales — Los 4 Mensajes Estratégicos',
+    subtitle: 'De Believe / The Orchard a Too Lost, FUGA, Create Music Group, Symphonic — secuencia para asegurar el mejor adelanto posible',
     icon: '📧',
     iconBg: '#1a1a2a',
     iconColor: '#5c8ce0',
     content: `
       <div class="highlight-box">
-        <strong>Estrategia de Comunicación:</strong><br>
-        • 2 multinacionales de liquidez (Believe Music y The Orchard)<br>
+        <strong>Estrategia de Comunicación — Múltiples Frentes:</strong><br>
+        • <strong>Too Lost</strong> (🥇 RECOMENDADA) — 100% derechos, adelantos directos, sin exclusividad perpetua<br>
+        • <strong>FUGA (Kobalt)</strong> — Infraestructura enterprise, deals directos con todos los DSPs<br>
+        • <strong>Believe Music</strong> — Gran alcance LATAM, adelantos disponibles para catálogos grandes<br>
+        • <strong>The Orchard (Sony)</strong> — Distribución masiva, 200+ territorios, sync publishing<br>
+        • <strong>Create Music Group</strong> — Agresiva en adelantos, monetización YouTube prioritaria<br>
+        • <strong>Symphonic Distribution</strong> — Enfoque LATAM, pitch editorial, distribución física<br>
+        • <strong>Stem</strong> — Transparente, pagos rápidos, advance programs para catálogos probados<br>
         • 4 mensajes progresivos — cada uno con un disparador específico<br>
-        • Ningún mensaje revela el nombre de la otra empresa<br>
+        • Ningún mensaje revela los nombres de las otras empresas<br>
         • La presión del Mensaje 4 es real sin necesidad de decir nombres<br>
-        • <strong>No mencionar los nombres a Ramón Orlando todavía</strong>
+        • <strong>No mencionar los nombres definitivos a Ramón Orlando todavía</strong>
       </div>
 
       <h4>MENSAJE 1 — Primer Contacto (Se envía esta semana, sin documentos)</h4>
@@ -823,6 +829,80 @@ const MASTER_SECTIONS = [
         No es proyección futura — es valor existente no capturado. Una distribuidora que active este catálogo
         recupera su adelanto con los ingresos ya existentes, sin depender de crecimiento futuro.
         El evento del 23 de septiembre convierte un retorno de 3-4 años en uno de 12-18 meses.
+      </div>
+
+      <h4>📊 Comparativa de Distribuidoras — ¿A cuál contactar primero?</h4>
+      <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">Orden de prioridad según perfil del catálogo (300M+ streams, 178 canciones, tropical LATAM):</p>
+      <table>
+        <tr><th>Prioridad</th><th>Distribuidora</th><th>Adelanto</th><th>% Derechos</th><th>LATAM</th><th>Por qué</th></tr>
+        <tr>
+          <td><span style="color:#2ecc71;font-weight:700;">1°</span></td>
+          <td><strong style="color:#2ecc71;">Too Lost</strong></td>
+          <td class="num" style="color:#2ecc71;">✅ Directo</td>
+          <td class="num" style="color:#2ecc71;">100%</td>
+          <td class="num">✅</td>
+          <td style="font-size:11px;">Conservas el 100% de tus derechos y regalías, adelanto basado en streams históricos, sin exclusividad perpetua</td>
+        </tr>
+        <tr>
+          <td><span style="color:#6ecfa5;font-weight:700;">2°</span></td>
+          <td><strong style="color:#6ecfa5;">FUGA (Kobalt)</strong></td>
+          <td class="num" style="color:#6ecfa5;">✅ Vía partner</td>
+          <td class="num" style="color:#6ecfa5;">100%</td>
+          <td class="num">✅</td>
+          <td style="font-size:11px;">Infraestructura enterprise-level, deals directos con todos los DSPs, reporting detallado</td>
+        </tr>
+        <tr>
+          <td><span style="color:#e8c96e;font-weight:700;">3°</span></td>
+          <td><strong style="color:#e8c96e;">Believe Music</strong></td>
+          <td class="num" style="color:#e8c96e;">✅ Disponible</td>
+          <td class="num">~85%</td>
+          <td class="num">✅✅</td>
+          <td style="font-size:11px;">Fuerte presencia LATAM, pitching editorial, pero toman comisión sobre regalías</td>
+        </tr>
+        <tr>
+          <td><span style="color:#e8a06e;font-weight:700;">4°</span></td>
+          <td><strong style="color:#e8a06e;">The Orchard (Sony)</strong></td>
+          <td class="num" style="color:#e8a06e;">✅ Altos</td>
+          <td class="num">~80%</td>
+          <td class="num">✅</td>
+          <td style="font-size:11px;">Distribución masiva 200+ territorios, sync publishing, pero proceso de aplicación</td>
+        </tr>
+        <tr>
+          <td><span style="color:#7db8e8;font-weight:700;">5°</span></td>
+          <td><strong style="color:#7db8e8;">Create Music Group</strong></td>
+          <td class="num" style="color:#7db8e8;">✅ Agresivos</td>
+          <td class="num">~85%</td>
+          <td class="num">—</td>
+          <td style="font-size:11px;">Conocidos por adelantos agresivos, monetización YouTube prioritaria, buenos para Content ID</td>
+        </tr>
+        <tr>
+          <td><span style="color:#9e7de8;font-weight:700;">6°</span></td>
+          <td><strong style="color:#9e7de8;">Symphonic Distribution</strong></td>
+          <td class="num" style="color:#9e7de8;">✅ Limitado</td>
+          <td class="num">100%</td>
+          <td class="num">✅✅</td>
+          <td style="font-size:11px;">Excelente para LATAM, pitch editorial, distribución física, soporte en español</td>
+        </tr>
+      </table>
+      <div class="highlight-box" style="border-color:#4dabf7;">
+        <strong>🥇 Alternativa Clave: beatBread</strong><br>
+        <strong>beatBread</strong> — Adelantos de <strong>$1,000 a $10M+</strong> sin ceder propiedad ni control.<br>
+        • No requieres exclusividad — puedes mantener a Too Lost como distribuidor<br>
+        • Usan ingresos de streaming y publishing como colateral<br>
+        • Financian a artistas, sellos y compositores independientes<br>
+        • Red de Financiamiento: comparas ofertas de múltiples distribuidores<br>
+        • Desde 2020 han financiado 2,000+ clientes en 6 continentes<br>
+        • <strong>Perfecto para:</strong> Obtener adelanto mientras Too Lost activa distribución y Content ID<br>
+        <a href="https://beatbread.com" target="_blank" style="color:var(--info-bright);">→ beatbread.com</a>
+      </div>
+
+      <div class="highlight-box" style="border-color:#2ecc71;">
+        <strong>🎯 Recomendación de Estrategia:</strong><br>
+        Envía el Mensaje 1 a <strong>Too Lost + FUGA + Believe</strong> simultáneamente.<br>
+        Too Lost es ideal porque <strong>conservas el 100% de tus derechos</strong> y te dan adelanto basado en streams reales.<br>
+        Si Too Lost no llega al rango de adelanto deseado ($500K-$1M), FUGA y Believe son respaldos sólidos.<br>
+        <strong>beatBread</strong> puede complementar: adelanto rápido mientras negocias distribución mayor.<br>
+        The Orchard, Create Music Group y Symphonic quedan como alternativa si los primeros no responden.
       </div>
     `
   },
@@ -1774,4 +1854,22 @@ function exportContractTxt() {
   a.download = 'contrato-asesoramiento-estrategico.txt';
   a.click();
   URL.revokeObjectURL(url);
+}
+/* ── Navigate to Master Plan section (from pipeline / flow clicks) ── */
+function navigateMasterSection(id) {
+  navigateTo('masterplan');
+  setTimeout(() => {
+    const header = document.getElementById('ms-header-' + id);
+    if (header) {
+      header.classList.remove('collapsed');
+      header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      header.style.transition = 'border-color 0.3s, box-shadow 0.3s';
+      header.style.borderColor = 'var(--accent)';
+      header.style.boxShadow = '0 0 20px rgba(201,169,110,0.2)';
+      setTimeout(() => {
+        header.style.borderColor = '';
+        header.style.boxShadow = '';
+      }, 2000);
+    }
+  }, 200);
 }

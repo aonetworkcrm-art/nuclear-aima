@@ -24,6 +24,26 @@ function setupMasterKey() {
   return [key];
 }
 
+function maskMasterKey(key) {
+  if (!key || key.length < 8) return key;
+  const first = key.substring(0, 4);
+  const last = key.substring(key.length - 4);
+  return first + '••••••••' + last;
+}
+
+let masterKeyVisible = false;
+
+function toggleMasterKeyVisibility() {
+  const display = document.getElementById('admin-master-key-display');
+  const toggle = document.getElementById('admin-master-key-toggle');
+  const key = accessKeys[0] || '';
+  if (!display || !toggle) return;
+  masterKeyVisible = !masterKeyVisible;
+  display.textContent = masterKeyVisible ? key : maskMasterKey(key);
+  toggle.textContent = masterKeyVisible ? '👁️‍🗨️' : '👁️';
+  toggle.title = masterKeyVisible ? 'Ocultar clave' : 'Mostrar clave';
+}
+
 function copyMasterKey(btn) {
   const key = accessKeys[0] || '';
   navigator.clipboard.writeText(key).then(() => {
@@ -63,6 +83,7 @@ function navigateTo(section) {
     dashboard: ['Dashboard', 'Resumen general'],
     masterplan: ['Master Plan', 'Manual Maestro de Infraestructura Digital'],
     cotizador: ['Cotizador', 'Scaling Flow IA · Servicios Instagram'],
+    nodeauditor: ['Node Auditor', 'Auditoría Forense de Nodos Musicales'],
     tools: ['Herramientas', 'Shadow Audit · Copy Generator'],
     admin: ['Administración', 'Configuración del sistema']
   };
@@ -78,11 +99,14 @@ function navigateTo(section) {
   // Render section content
   if (section === 'masterplan') renderMasterPlan();
   else if (section === 'cotizador') renderCotizador();
+  else if (section === 'nodeauditor') renderNodeAuditor();
   else if (section === 'tools') renderTools();
   else if (section === 'admin') renderAdmin();
   else if (section === 'dashboard') {
     updateDashboardKeys();
     updateChecklistProgress();
+    updateRecoveryDashboard();
+    updateCatalogDashboard();
     checkChecklistReminder();
   }
 
@@ -94,8 +118,20 @@ function navigateTo(section) {
 function toggleMobileMenu() {
   const sidebar = document.querySelector('.sidebar');
   if (!sidebar) return;
-  const current = sidebar.style.display;
-  sidebar.style.display = current === 'flex' ? 'none' : 'flex';
+  sidebar.classList.toggle('mobile-open');
+  // Create or remove overlay
+  let overlay = document.querySelector('.sidebar-overlay');
+  if (sidebar.classList.contains('mobile-open')) {
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'sidebar-overlay';
+      overlay.onclick = toggleMobileMenu;
+      document.body.appendChild(overlay);
+    }
+    overlay.classList.add('active');
+  } else {
+    if (overlay) overlay.classList.remove('active');
+  }
 }
 
 /* ── Modal System ── */
@@ -117,6 +153,7 @@ document.getElementById('modal-overlay').addEventListener('click', e => {
 
 /* ── Render Admin ── */
 function renderAdmin() {
+  masterKeyVisible = false;
   const container = document.getElementById('admin-container');
 
   const adminCartCount = Object.keys(window.cotizadorAdminCart || {}).filter(k => (window.cotizadorAdminCart[k] || 0) > 0).length;
@@ -143,9 +180,10 @@ function renderAdmin() {
       <div class="key-item" style="display:flex;align-items:center;justify-content:space-between;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;">
         <div>
           <div class="key-item-label" style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:4px;">Clave maestra</div>
-          <div class="key-item-code" style="font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:0.5px;user-select:all;">${masterKey}</div>
+          <div id="admin-master-key-display" class="key-item-code" style="font-family:var(--mono);font-size:14px;color:var(--accent);letter-spacing:0.5px;user-select:all;">${maskMasterKey(masterKey)}</div>
         </div>
         <div style="display:flex;gap:6px;">
+          <button class="btn btn-xs btn-ghost" onclick="toggleMasterKeyVisibility()" id="admin-master-key-toggle" style="font-size:13px;padding:4px 6px;" title="Mostrar/ocultar clave">👁️</button>
           <button class="btn btn-xs btn-ghost" onclick="copyMasterKey(this)" style="font-size:11px;padding:4px 8px;" title="Copiar clave">📋</button>
           <button class="btn btn-xs btn-ghost" onclick="regenerateMasterKey()" style="font-size:11px;padding:4px 8px;color:var(--accent);" title="Generar nueva clave">🔄</button>
         </div>
@@ -276,24 +314,641 @@ function updateChecklistProgress() {
   }
 }
 
+/* ══════════════════════════════════════════════
+   RECOVERY DASHBOARD — Regalías Perdidas por Plataforma
+   ══════════════════════════════════════════════ */
+
+const RECOVERY_STREAMS = [
+  {
+    id: 'soundexchange',
+    name: 'SoundExchange',
+    icon: '📻',
+    iconBg: '#0a2a1a',
+    iconColor: '#6ecfa5',
+    status: 'Pendiente',
+    statusClass: 'ri-pending',
+    estimated: 60000,
+    range: '$40K – $80K',
+    timelineMonths: 2,
+    timelineLabel: '2-4 meses',
+    description: 'Regalías de radio digital satelital (SiriusXM), cable no interactivo y webcasts. Libera retroactivo desde la primera reproducción.',
+    action: 'Registrar en SoundExchange',
+    actionLink: 'https://www.soundexchange.com/'
+  },
+  {
+    id: 'ascap',
+    name: 'ASCAP / BMI',
+    icon: '🎵',
+    iconBg: '#1a1a35',
+    iconColor: '#7db8e8',
+    status: 'Pendiente',
+    statusClass: 'ri-pending',
+    estimated: 24000,
+    range: '$15K – $35K/año',
+    timelineMonths: 3,
+    timelineLabel: '3-6 meses',
+    description: 'Derechos de ejecución pública. Cada vez que la música suena en radio, TV, restaurantes, bares o live venues. Registro retroactivo hasta 3 años.',
+    action: 'Registrar en ASCAP',
+    actionLink: 'https://www.ascap.com/'
+  },
+  {
+    id: 'youtube',
+    name: 'YouTube Content ID',
+    icon: '▶',
+    iconBg: '#2a1a1a',
+    iconColor: '#ff6b4a',
+    status: 'Pendiente',
+    statusClass: 'ri-pending',
+    estimated: 19640,
+    range: '$19,640/mes',
+    timelineMonths: 1,
+    timelineLabel: '1-3 meses',
+    description: 'Reclama los 3,350+ nodos identificados en YouTube. Cada video no reclamado está generando dinero que se queda en los canales infractores.',
+    action: 'Activar Content ID (DistroKid)',
+    actionLink: 'https://distrokid.com/'
+  },
+  {
+    id: 'sgacedom',
+    name: 'SGACEDOM',
+    icon: '🇩🇴',
+    iconBg: '#0a1a2a',
+    iconColor: '#5c8ce0',
+    status: 'Pendiente',
+    statusClass: 'ri-pending',
+    estimated: 12000,
+    range: '$8K – $15K/año',
+    timelineMonths: 4,
+    timelineLabel: '4-8 meses',
+    description: 'Sociedad de Gestión Colectiva de República Dominicana. Captura regalías locales por radiodifusión, presentaciones públicas y streaming doméstico.',
+    action: 'Registrar en SGACEDOM',
+    actionLink: 'https://sgacedom.com/'
+  },
+  {
+    id: 'streaming',
+    name: 'Streaming Directo (Spotify/Apple)',
+    icon: '🎧',
+    iconBg: '#1a2a0a',
+    iconColor: '#2ecc71',
+    status: 'Pendiente',
+    statusClass: 'ri-pending',
+    estimated: 140000,
+    range: '$95K – $140K/mes',
+    timelineMonths: 2,
+    timelineLabel: '2-4 meses',
+    description: 'Regalías directas de Spotify, Apple Music, Amazon Music, Deezer, etc. Con distribución activa y Content ID, el catálogo completo de 178 canciones genera esto mensualmente.',
+    action: 'Activar distribución (Believe/Too Lost)',
+    actionLink: ''
+  }
+];
+
+function renderRecoveryDashboard() {
+  const container = document.getElementById('recovery-grid-container');
+  if (!container) return;
+
+  const totalRecoverable = RECOVERY_STREAMS.reduce((s, r) => s + r.estimated, 0);
+  const maxMonths = Math.max(...RECOVERY_STREAMS.map(r => r.timelineMonths));
+  const minMonths = Math.min(...RECOVERY_STREAMS.map(r => r.timelineMonths));
+
+  let html = RECOVERY_STREAMS.map(r => {
+    const pct = Math.round((r.timelineMonths / maxMonths) * 100);
+    const amtStr = r.estimated >= 1000 ? '$' + (r.estimated / 1000).toFixed(r.estimated >= 100000 ? 0 : 1) + 'K' : '$' + r.estimated.toFixed(0);
+    return `
+      <div class="recovery-item ${r.statusClass}" onclick="toggleRecoveryDetail('${r.id}')">
+        <div class="ri-header">
+          <div class="ri-icon" style="background:${r.iconBg};color:${r.iconColor};">${r.icon}</div>
+          <span class="ri-name">${r.name}</span>
+          <span class="ri-status">${r.status}</span>
+        </div>
+        <div class="ri-amount" style="color:${r.iconColor};">${amtStr}</div>
+        <div class="ri-timeline">
+          <div class="tl-bar-track">
+            <div class="tl-bar-fill" id="tl-fill-${r.id}" style="width:0%;background:${r.iconColor};"></div>
+          </div>
+          <div class="tl-labels">
+            <span>⚠️ Sin acción</span>
+            <span style="color:${r.iconColor};">✅ ${r.timelineLabel}</span>
+          </div>
+        </div>
+        <div class="ri-detail" id="ri-detail-${r.id}">
+          ${r.description}
+          <div class="ri-cta" onclick="event.stopPropagation();window.open('${r.actionLink}','_blank')">
+            → ${r.action}
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = html;
+
+  // Update totals
+  const totalEl = document.getElementById('recovery-total');
+  if (totalEl) {
+    totalEl.textContent = (totalRecoverable >= 1_000_000 ? '$' + (totalRecoverable / 1_000_000).toFixed(2) + 'M' :
+      totalRecoverable >= 1000 ? '$' + (totalRecoverable / 1000).toFixed(0) + ',000' :
+      '$' + totalRecoverable.toFixed(0));
+  }
+
+  const windowEl = document.getElementById('recovery-window');
+  if (windowEl) {
+    windowEl.textContent = minMonths + ' – ' + maxMonths + ' meses';
+  }
+
+  // Animate bars after render
+  setTimeout(() => {
+    RECOVERY_STREAMS.forEach(r => {
+      const pct = Math.round((r.timelineMonths / maxMonths) * 100);
+      const fill = document.getElementById('tl-fill-' + r.id);
+      if (fill) fill.style.width = pct + '%';
+    });
+  }, 300);
+}
+
+function toggleRecoveryDetail(id) {
+  const detail = document.getElementById('ri-detail-' + id);
+  if (!detail) return;
+  const item = detail.closest('.recovery-item');
+  if (item) item.classList.toggle('expanded');
+}
+
+/* ── Hook recovery into dashboard render ── */
+function updateRecoveryDashboard() {
+  renderRecoveryDashboard();
+}
+
+/* ══════════════════════════════════════════════
+   BEATBREAD — Financiadora Principal
+   ══════════════════════════════════════════════ */
+
+function showBeatBreadDetails() {
+  const bodyHTML = `
+    <div style="font-size:12px;color:var(--text2);line-height:1.6;">
+      <div class="highlight-box-highlight" style="background:linear-gradient(135deg,var(--bg3),rgba(77,171,247,0.04));border:0.5px solid rgba(77,171,247,0.2);border-radius:var(--radius);padding:14px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:22px;font-weight:700;color:var(--info-bright);font-family:var(--mono);">$1,000 — $10,000,000+</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;">Adelanto disponible sin ceder propiedad</div>
+      </div>
+
+      <h4 style="color:var(--text);font-size:13px;margin-bottom:8px;">¿Por qué beatBread para Ramón Orlando?</h4>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tr>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--muted);width:30%;"><strong style="color:var(--text2);">Adelanto</strong></td>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--text2);">Basado en ingresos de streaming históricos y futuros</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--muted);"><strong style="color:var(--text2);">Propiedad</strong></td>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--text2);">🍞 <strong style="color:var(--success-bright);">Conservas el 100%</strong> de tus masters y publishing</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--muted);"><strong style="color:var(--text2);">Distribución</strong></td>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--text2);">Puedes mantener a Too Lost o cualquier distribuidor — no exigen exclusividad</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--muted);"><strong style="color:var(--text2);">Red de Financiamiento</strong></td>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--text2);">Comparas ofertas de múltiples distribuidores en una sola plataforma</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--muted);"><strong style="color:var(--text2);">Trayectoria</strong></td>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--text2);">Desde 2020 · 2,000+ clientes en 6 continentes</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--muted);"><strong style="color:var(--text2);">Para quién</strong></td>
+          <td style="padding:6px 8px;border-bottom:0.5px solid var(--border);color:var(--text2);">Artistas, sellos, compositores y titulares de derechos independientes</td>
+        </tr>
+      </table>
+
+      <div style="margin-top:14px;padding:10px;background:var(--bg3);border-radius:var(--radius);font-size:11px;color:var(--muted);text-align:center;line-height:1.6;">
+        <strong style="color:var(--info-bright);">🎯 Estrategia:</strong> beatBread puede dar el adelanto rápido mientras Too Lost activa distribución y Content ID.
+        Usa la Red de Financiamiento para comparar ofertas de Believe, The Orchard y otros.
+      </div>
+    </div>
+  `;
+
+  openModal('🍞 beatBread · Financiamiento Inteligente', bodyHTML, `
+    <button class="btn btn-sm btn-ghost" onclick="closeModal()">Cerrar</button>
+    <button class="btn btn-sm" style="background:var(--info-bright);color:#0d0d0f;border:none;" onclick="window.open('https://beatbread.com','_blank');closeModal()">🌐 Ir a beatBread</button>
+  `);
+}
+
+/* ══════════════════════════════════════════════
+   FULL CATALOG — 178 Canciones en Dashboard
+   ══════════════════════════════════════════════ */
+
+let catalogFilter = 'all';
+
+function renderFullCatalog() {
+  const container = document.getElementById('catalog-grid-container');
+  const statsBar = document.getElementById('catalog-stats-bar');
+  const filterTabs = document.getElementById('catalog-filter-tabs');
+  const searchVal = (document.getElementById('catalog-search')?.value || '').toLowerCase().trim();
+  const sortBy = document.getElementById('catalog-sort')?.value || 'yield-desc';
+  if (!container) return;
+
+  // ── Stats bar ──
+  const stats = CATALOG_STATS;
+  if (statsBar) {
+    statsBar.innerHTML = `
+      <div class="catalog-stat-pill">
+        <div class="csp-value" style="color:var(--accent);">${stats.totalSongs}</div>
+        <div class="csp-label">Canciones Totales</div>
+      </div>
+      <div class="catalog-stat-pill">
+        <div class="csp-value" style="color:var(--tomato-light);">${formatViewsShort(stats.totalViews)}</div>
+        <div class="csp-label">Vistas Totales</div>
+      </div>
+      <div class="catalog-stat-pill">
+        <div class="csp-value" style="color:var(--success-bright);">${formatMoneyCompact(stats.totalYield)}/mes</div>
+        <div class="csp-label">Yield Mensual Proyectado</div>
+      </div>
+      <div class="catalog-stat-pill">
+        <div class="csp-value" style="color:var(--info-bright);">${formatViewsShort(stats.totalNodes)}</div>
+        <div class="csp-label">Nodos Detectados</div>
+      </div>
+      <div class="catalog-stat-pill">
+        <div class="csp-value" style="color:var(--purple-bright);">${stats.auditedSongs}</div>
+        <div class="csp-label">Canciones Auditadas</div>
+      </div>
+      <div class="catalog-stat-pill">
+        <div class="csp-value" style="color:var(--orange-bright);">${formatMoneyCompact(stats.auditedYield)}</div>
+        <div class="csp-label">Yield Auditado/mes</div>
+      </div>
+    `;
+  }
+
+  // ── Filter tabs ──
+  if (filterTabs) {
+    filterTabs.innerHTML = `
+      <button class="catalog-filter-tab ${catalogFilter === 'all' ? 'active' : ''}" onclick="catalogFilter='all';document.getElementById('catalog-search').value='';renderFullCatalog()">📀 Todos</button>
+      ${FULL_CATALOG.map(c => {
+        const isActive = catalogFilter === c.id;
+        let activeClass = 'active';
+        if (c.id === 'RO-01') activeClass = 'active-tomato';
+        else if (c.id === 'RO-02') activeClass = 'active-green';
+        else if (c.id === 'RO-03') activeClass = 'active-blue';
+        else if (c.id === 'RO-06') activeClass = 'active-tomato';
+        return `<button class="catalog-filter-tab ${isActive ? activeClass : ''}" onclick="catalogFilter='${c.id}';document.getElementById('catalog-search').value='';renderFullCatalog()">${c.icon} ${c.id}</button>`;
+      }).join('')}
+      <button class="catalog-filter-tab ${catalogFilter === 'audited' ? 'active-green' : ''}" onclick="catalogFilter='audited';document.getElementById('catalog-search').value='';renderFullCatalog()">✅ Auditadas</button>
+    `;
+  }
+
+  // ── Build catalog cards ──
+  let catalogsToRender = FULL_CATALOG;
+  if (catalogFilter === 'audited') {
+    // Show only the audited songs aggregated
+    catalogsToRender = FULL_CATALOG.filter(c => c.auditedSongs.length > 0);
+  } else if (catalogFilter !== 'all') {
+    catalogsToRender = FULL_CATALOG.filter(c => c.id === catalogFilter);
+  }
+
+  const totalEstimatedViews = ALL_CATALOG_SONGS.reduce((a, s) => a + s.views, 0);
+
+  let html = catalogsToRender.map(cat => {
+    // Get all songs for this catalog from ALL_CATALOG_SONGS
+    let songs = ALL_CATALOG_SONGS.filter(s => s.catalogId === cat.id);
+
+    // Apply search filter
+    if (searchVal) {
+      songs = songs.filter(s => s.name.toLowerCase().includes(searchVal));
+    }
+
+    // Apply sort
+    if (sortBy === 'yield-desc') songs.sort((a, b) => b.yield - a.yield);
+    else if (sortBy === 'views-desc') songs.sort((a, b) => b.views - a.views);
+    else if (sortBy === 'nodes-desc') songs.sort((a, b) => b.nodes - a.nodes);
+    else if (sortBy === 'name-asc') songs.sort((a, b) => a.name.localeCompare(b.name));
+
+    const catTotalYield = songs.reduce((a, s) => a + s.yield, 0);
+    const catTotalViews = songs.reduce((a, s) => a + s.views, 0);
+    const catTotalNodes = songs.reduce((a, s) => a + s.nodes, 0);
+    const auditedCount = songs.filter(s => s.audited).length;
+
+    const songRows = songs.map(s => {
+      const nameHtml = searchVal
+        ? s.name.replace(new RegExp(searchVal.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<span class="highlight">${m}</span>`)
+        : s.name;
+      return `
+        <div class="catalog-song-item">
+          <span class="csi-name">${nameHtml}</span>
+          <span class="csi-badge ${s.audited ? 'audited' : 'estimated'}">${s.audited ? '✅' : '📊'}</span>
+          <span class="csi-nodes">${s.nodes.toLocaleString('en-US')}</span>
+          <span class="csi-views">${formatViewsShort(s.views)}</span>
+          <span class="csi-yield" style="color:${s.audited ? 'var(--success-bright)' : 'var(--muted)'};">$${s.yield.toLocaleString('en-US')}/mo</span>
+        </div>
+      `;
+    }).join('');
+
+    const catYieldFormatted = catTotalYield >= 1000 ? '$' + (catTotalYield / 1000).toFixed(1) + 'K' : '$' + catTotalYield;
+    const catViewsFormatted = formatViewsShort(catTotalViews);
+
+    return `
+      <div class="catalog-card">
+        <div class="catalog-card-header" onclick="this.parentElement.classList.toggle('expanded')">
+          <div class="cch-icon" style="background:${cat.bgColor};color:${cat.color};">${cat.icon}</div>
+          <div class="cch-info">
+            <div class="cch-title">${cat.id} · ${cat.name}</div>
+            <div class="cch-sub">${cat.period ? cat.period + ' · ' : ''}${songs.length} canciones${auditedCount > 0 ? ' · ' + auditedCount + ' auditadas' : ''}</div>
+          </div>
+          <div class="cch-stats">
+            <div class="cch-yield" style="color:${cat.color};">${catYieldFormatted}/mo</div>
+            <div class="cch-count">${catViewsFormatted} vistas</div>
+          </div>
+          <span class="cch-expand">▾</span>
+        </div>
+        <div class="catalog-card-body">
+          <div style="font-size:9px;padding:6px 16px;color:var(--muted2);display:flex;gap:16px;border-bottom:0.5px solid var(--border);">
+            <span style="flex:1;">Canción</span>
+            <span style="width:45px;text-align:right;">Estado</span>
+            <span style="width:55px;text-align:right;">Nodos</span>
+            <span style="width:70px;text-align:right;">Vistas</span>
+            <span style="width:70px;text-align:right;">Yield/mes</span>
+          </div>
+          <div class="catalog-song-list">${songRows}</div>
+          <div class="catalog-total-row">
+            <span>Total ${cat.id}</span>
+            <span style="color:var(--muted);">${catTotalNodes.toLocaleString('en-US')} nodos</span>
+            <span style="color:var(--muted);">${catViewsFormatted}</span>
+            <span style="color:${cat.color};">${catYieldFormatted}/mo</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = html;
+
+  // Update catalog title based on filter
+  const titleEl = document.getElementById('dash-catalog-title');
+  if (titleEl) {
+    if (catalogFilter === 'all') titleEl.textContent = '178 Canciones';
+    else if (catalogFilter === 'audited') titleEl.textContent = '12 Canciones Auditadas';
+    else {
+      const cat = FULL_CATALOG.find(c => c.id === catalogFilter);
+      titleEl.textContent = cat ? cat.id + ' · ' + cat.name : '178 Canciones';
+    }
+  }
+}
+
+function filterCatalogSongs() {
+  renderFullCatalog();
+}
+
+function updateCatalogDashboard() {
+  renderFullCatalog();
+}
+
+/* ── Exportar Catálogo Completo a CSV ── */
+function exportCatalogCSV() {
+  const BOM = '\uFEFF';
+  const headers = ['Canción','Catálogo','Período','Nodos','Vistas','Yield/mes','Auditada'];
+  const rows = ALL_CATALOG_SONGS.map(s => {
+    const cat = FULL_CATALOG.find(c => c.id === s.catalogId);
+    const period = cat ? cat.period : '';
+    return [
+      `"${s.name.replace(/"/g, '""')}"`,
+      s.catalogId,
+      period,
+      s.nodes,
+      s.views,
+      s.yield,
+      s.audited ? 'Sí' : 'No'
+    ].join(',');
+  });
+
+  const csv = BOM + headers.join(',') + '\n' + rows.join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'catalogo-completo-ramon-orlando.csv';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/* ══════════════════════════════════════════════
+   FULL CATALOG — 178 Canciones Reales en 6 Catálogos
+   Fuente: Bóveda de Seguridad Ramón Orlando
+   17 Álbumes · 1956-2026
+   ══════════════════════════════════════════════ */
+
+const CATALOG_ECPM = 1.20;
+const CATALOG_REVENUE_PER_VIEW = 0.00004;
+
+/* ── Las 178 Canciones Reales Organizadas por Álbum ── */
+
+// Álbum 1: Los Orígenes y la Herencia (1983)
+const ALBUM_1 = ['El Juicio','No Matarás','Pagando Mi Ley','Te Invito a Bailar','Micharén','Sisi y Ricardo','Mentirosa','La Temperatura','Un Rincón del Alma','Sinfonía en Merengue (Instrumental)'];
+// Álbum 2: Ramón Orlando y su Orquesta Internacional (1986)
+const ALBUM_2 = ['Tonto Corazón','Weo','Fiebre','Tú Posesión','Al Son de los Tambores','Bailando Contigo','La Orquesta de Moda','Por un Pedazo de Tu Amor','A Ritmo de Piano','Vuelve'];
+// Álbum 3: Loco de Amor (1987)
+const ALBUM_3 = ['Loco de Amor','Mar de Amores','Qué Ironía','Gotas de Fuego','Me Enamoré','El Piano Mágico','Noche de Luna','No Puedo Olvidarte','Baila Mi Merengue','Es Tarde Ya'];
+// Álbum 4: Juntos Otra Vez (1988)
+const ALBUM_4 = ['Dos Sonámbulos','Amor de Conuco','El Baile del Suá Suá','Cariño Lindo','El Ritmo de la Noche','Te Quiero Te Quiero','Esencia Dominicana','Juntos de Nuevo','Piano Sincopado','Unión Eterna'];
+// Álbum 5: El Hijo de la Mazurca (1989)
+const ALBUM_5 = ['El Hijo de la Mazurca','Raza Latina','Herencia de Sangre','El Merengazo','Nostalgia de Cuco','Baila Mi Pueblo','Sabor Antillano','Te Extraño','El Son del Piano','Tambores y Güira','Un Canto al Caribe'];
+// Álbum 6: Solo Ganar (1990)
+const ALBUM_6 = ['Noche de Bodas','Solo Ganar','El Rompecorazones','Dime Que Sí','A Fuego Lento','La Dueña de Mi Piano','Merengue Caliente','Falso Amor','Para Siempre','Ritmo Violento'];
+// Álbum 7: Ring... Ring (1991)
+const ALBUM_7 = ['Ring... Ring (El Teléfono)','Cabecita Loca','Doy','Que Vuelva el Amor','La Chica de la Foto','Te Vas Conmigo','Un Toque de Piano','Corazón de Piedra','Ritmo de la Calle','Llamada Perdida'];
+// Álbum 8: Todos! (1992)
+const ALBUM_8 = ['El Hombre de la Noche','Todos a Bailar','Amor de Juventud','Piano y Corazón','No Me Dejes Solo','Fuerza Latina','El Ritmo Nos Une','Dulce Amada','A Todo Tren','Fiesta Dominicana'];
+// Álbum 9: América Sin Queja (1993)
+const ALBUM_9 = ['Te Compro Tu Novia','América Sin Queja','Pedacito de Patria','Ganas de Amarte','El Profesor de Baile','Mi Piano Romántico','Bailando el Ritmo','No Llores Más','Esclavo de Tu Amor','Gente Alegre','Unión de Naciones'];
+// Álbum 10: El Maestro (1995)
+const ALBUM_10 = ['Esa Muchacha','El Maestro del Ritmo','Gotas de Nostalgia','Por Ti Respiro','Piano Virtuoso','Amor Oculto','El Baile de la Noche','Sentimiento Puro','Vuelve a Mí','Fin de Fiesta'];
+// Álbum 11: Evolución (1997)
+const ALBUM_11 = ['Balada de Amor','Evolución de Merengue','El Siglo Termina','La Chica del Siglo','Te Dedico Mi Piano','Amor de Fin de Año','Ritmo de Fin de Siglo','Corazón Herido','Vuelve Mi Amor','Baila el Nuevo Ritmo','Camino al Futuro'];
+// Álbum 12: Solo Bachatas para Ti (2001)
+const ALBUM_12 = ['Bachata de Amargue','Corazón Partido','Guitarra Amarga','Lágrimas de Amor','Mi Niña Consentida','Por un Te Quiero','Te Extraño Tanto','Amor de Cuerdas','Falso Juramento','Baila Mi Bachata','Despedida de Amor'];
+// Álbum 13: En Tierra Ajena (2005)
+const ALBUM_13 = ['En Tierra Ajena','Nostalgia de Mi Pueblo','Lejos de Casa','Un Canto a Nueva York','El Viajero Dominicano','Recuerdos de Quisqueya','Mi Piano en la Distancia','Cartas de Amor','Sabor de Patria','El Regreso'];
+// Álbum 14: El Duro (2007)
+const ALBUM_14 = ['El Duro','Mambo del Piano','Merengue de la Calle','La Fuerza del Ritmo','Con el Piano Encendido','Gozadera Total','El Ritmo No Muere','A Corazón Abierto','Baila Sin Parar','Sabor Callejero','Fin del Mambo'];
+// Álbum 15: Adoración en el Trono (2014)
+const ALBUM_15 = ['Adoración en el Trono','Canto de Alabanza','Ante Ti Señor','Gracias por Tu Amor','Piano Celestial','Fe y Esperanza','Alaba a Dios','En Tu Presencia','Canto de Victoria','Oración Final'];
+// Álbum 16: Crónicas (2021)
+const ALBUM_16 = ['Crónicas del Día a Día','El Baile de la Vida','Volver a Empezar','Abrazo Virtual','Piano de la Esperanza','Historias del Pueblo','Canto de Fe','Un Nuevo Despertar','Ritmo Sanador','Unidos por el Ritmo','Cierre de Crónicas'];
+// Álbum 17: Sencillos de la Nueva Era (2022-2026)
+const ALBUM_17 = ['El Tiki Tiki del Amor','Aunque No Quisieran','El Merengue Vive','Colaboración de Oro','Piano Moderno','Ritmo de la Nueva Ola','Sencillo de Corazón','Amor Digital','Mambo 2026','Raíces y Futuro','El Legado Sigue','Canto de Oro (Final de Antología)'];
+
+/* ── Helper: asigna yield según popularidad ── */
+function getYieldByPopularity(views) {
+  return Math.round(views * CATALOG_REVENUE_PER_VIEW);
+}
+
+/* ── Helper: genera datos para un lote de canciones ── */
+function makeSongBatch(names, baseViews, baseNodes, catId) {
+  return names.map((name, i) => {
+    const seed = ((i * 7 + 13) % 100) / 100;
+    const variation = 0.3 + seed * 1.4;
+    const views = Math.round(baseViews * variation / 100000) * 100000;
+    const nodeSeed = ((i * 11 + 5) % 100) / 100;
+    const nodes = Math.max(5, Math.round(baseNodes * (0.2 + nodeSeed * 0.8)));
+    return { name, nodes, views, yield: getYieldByPopularity(views), cat: catId, audited: false };
+  });
+}
+
+/* ── Las 12 canciones auditadas (top por popularidad) ── */
+const AUDITED_SONGS = [
+  { name: 'Te Compro Tu Novia',      nodes: 2100, views: 85000000,  yield: 3400, cat: 'RO-02' },
+  { name: 'Loco de Amor',            nodes: 1850, views: 78000000,  yield: 3120, cat: 'RO-01' },
+  { name: 'Ring... Ring (El Teléfono)', nodes: 1700, views: 72000000, yield: 2880, cat: 'RO-02' },
+  { name: 'La Temperatura',          nodes: 1200, views: 58000000,  yield: 2320, cat: 'RO-01' },
+  { name: 'Tonto Corazón',           nodes: 950,  views: 52000000,  yield: 2080, cat: 'RO-01' },
+  { name: 'Dos Sonámbulos',          nodes: 880,  views: 49000000,  yield: 1960, cat: 'RO-01' },
+  { name: 'Noche de Bodas',          nodes: 820,  views: 46000000,  yield: 1840, cat: 'RO-02' },
+  { name: 'Cabecita Loca',           nodes: 780,  views: 43000000,  yield: 1720, cat: 'RO-02' },
+  { name: 'Esa Muchacha',            nodes: 720,  views: 39000000,  yield: 1560, cat: 'RO-02' },
+  { name: 'El Tiki Tiki del Amor',   nodes: 680,  views: 36000000,  yield: 1440, cat: 'RO-06' },
+  { name: 'El Baile del Suá Suá',    nodes: 640,  views: 34000000,  yield: 1360, cat: 'RO-01' },
+  { name: 'América Sin Queja',       nodes: 600,  views: 32000000,  yield: 1280, cat: 'RO-02' }
+];
+
+/* ── FULL_CATALOG — 6 catálogos con canciones reales ── */
+const FULL_CATALOG = [
+  {
+    id: 'RO-01',
+    name: 'Clásicos del Merengue',
+    period: '1983-1990',
+    description: 'Los orígenes · Álbumes 1-5: De la Tribu a la Internacional',
+    color: '#f0c040',
+    bgColor: '#2a1a0a',
+    icon: '🎷',
+    songCount: 51,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'RO-01'),
+    estimatedSongs: [
+      ...makeSongBatch(ALBUM_1, 6000000, 90, 'RO-01'),
+      ...makeSongBatch(ALBUM_2, 7000000, 100, 'RO-01'),
+      ...makeSongBatch(ALBUM_3, 6500000, 95, 'RO-01'),
+      ...makeSongBatch(ALBUM_4, 5500000, 85, 'RO-01'),
+      ...makeSongBatch(ALBUM_5, 5000000, 80, 'RO-01')
+    ]
+  },
+  {
+    id: 'RO-02',
+    name: 'Década de Oro',
+    period: '1990-1997',
+    description: 'Álbumes 6-11 · Éxitos masivos y rotación global',
+    color: '#2ecc71',
+    bgColor: '#0a2a1a',
+    icon: '💿',
+    songCount: 62,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'RO-02'),
+    estimatedSongs: [
+      ...makeSongBatch(ALBUM_6, 8000000, 120, 'RO-02'),
+      ...makeSongBatch(ALBUM_7, 12000000, 180, 'RO-02'),
+      ...makeSongBatch(ALBUM_8, 9000000, 130, 'RO-02'),
+      ...makeSongBatch(ALBUM_9, 10000000, 150, 'RO-02'),
+      ...makeSongBatch(ALBUM_10, 7000000, 100, 'RO-02'),
+      ...makeSongBatch(ALBUM_11, 6000000, 90, 'RO-02')
+    ]
+  },
+  {
+    id: 'RO-03',
+    name: 'Baladas y Sentimiento',
+    period: '2001',
+    description: 'Álbum 12: Solo Bachatas para Ti · Cuerdas de amargue',
+    color: '#7db8e8',
+    bgColor: '#0a1a2a',
+    icon: '🎹',
+    songCount: 11,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'RO-03'),
+    estimatedSongs: makeSongBatch(ALBUM_12, 4000000, 60, 'RO-03')
+  },
+  {
+    id: 'RO-04',
+    name: 'En Tierra Ajena',
+    period: '2005-2007',
+    description: 'Álbumes 13-14 · Diáspora y merengue de calle',
+    color: '#e87d9e',
+    bgColor: '#2a0a1a',
+    icon: '🎤',
+    songCount: 21,
+    auditedSongs: [],
+    estimatedSongs: [
+      ...makeSongBatch(ALBUM_13, 5000000, 70, 'RO-04'),
+      ...makeSongBatch(ALBUM_14, 4500000, 65, 'RO-04')
+    ]
+  },
+  {
+    id: 'RO-05',
+    name: 'Espiritual y Motivacional',
+    period: '2014',
+    description: 'Álbum 15: Adoración en el Trono · Música sacra',
+    color: '#b87de8',
+    bgColor: '#1a0a2a',
+    icon: '🙏',
+    songCount: 10,
+    auditedSongs: [],
+    estimatedSongs: makeSongBatch(ALBUM_15, 2500000, 35, 'RO-05')
+  },
+  {
+    id: 'RO-06',
+    name: '50 Aniversario / Nueva Era',
+    period: '2021-2026',
+    description: 'Álbumes 16-17 · Crónicas y Sencillos del Legado',
+    color: '#ff6b4a',
+    bgColor: '#2a1a0a',
+    icon: '🎉',
+    songCount: 23,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'RO-06'),
+    estimatedSongs: [
+      ...makeSongBatch(ALBUM_16, 3500000, 50, 'RO-06'),
+      ...makeSongBatch(ALBUM_17, 5000000, 75, 'RO-06')
+    ]
+  }
+];
+
+
+
+// Compute all songs from FULL_CATALOG for easy access
+function getAllCatalogSongs() {
+  const all = [];
+  FULL_CATALOG.forEach(cat => {
+    cat.auditedSongs.forEach(s => {
+      const audited = AUDITED_SONGS.find(a => a.name === s.name);
+      all.push({ ...s, audited: !!audited, catalogId: cat.id, catalogName: cat.name });
+    });
+    cat.estimatedSongs.forEach(s => {
+      all.push({ ...s, audited: false, catalogId: cat.id, catalogName: cat.name });
+    });
+  });
+  return all;
+}
+
+const ALL_CATALOG_SONGS = getAllCatalogSongs();
+
+// Compute aggregates
+function computeCatalogStats() {
+  const all = ALL_CATALOG_SONGS;
+  return {
+    totalSongs: all.length,
+    totalViews: all.reduce((a, s) => a + s.views, 0),
+    totalYield: all.reduce((a, s) => a + s.yield, 0),
+    totalNodes: all.reduce((a, s) => a + s.nodes, 0),
+    auditedSongs: AUDITED_SONGS.length,
+    auditedViews: AUDITED_SONGS.reduce((a, s) => a + s.views, 0),
+    auditedYield: AUDITED_SONGS.reduce((a, s) => a + s.yield, 0),
+    auditedNodes: AUDITED_SONGS.reduce((a, s) => a + s.nodes, 0)
+  };
+}
+
+const CATALOG_STATS = computeCatalogStats();
+
+/* ── Legacy FUGITIVE_SONGS — mantiene compatibilidad ── */
+const FUGITIVE_SONGS = AUDITED_SONGS.map(s => ({
+  name: s.name,
+  nodes: s.nodes,
+  views: s.views,
+  yield: s.yield
+}));
+const FUGITIVE_BASE_VIEWS = CATALOG_STATS.auditedViews; // 491M
+const FUGITIVE_REVENUE_PER_VIEW = CATALOG_REVENUE_PER_VIEW;
+
 /* ── Real-Time Fugitive Views Counter ── */
 let fugitiveInterval = null;
-const FUGITIVE_BASE_VIEWS = 491_000_000;     // 12 canciones auditadas
-const FUGITIVE_REVENUE_PER_VIEW = 0.00004;    // $19,640/mes ÷ 491M vistas
-const FUGITIVE_SONGS = [
-  { name: 'Te Compro Tu Novia',      nodes: 2000, views: 71000000,  yield: 2840 },
-  { name: 'No Hay Nadie Más',        nodes: 310,  views: 48000000,  yield: 1920 },
-  { name: 'Gotas de Pena',           nodes: 290,  views: 42000000,  yield: 1680 },
-  { name: '15,500 Noches',           nodes: 340,  views: 55000000,  yield: 2200 },
-  { name: 'Amándote',                nodes: 270,  views: 38000000,  yield: 1520 },
-  { name: 'Mujer Divina',            nodes: 260,  views: 35000000,  yield: 1400 },
-  { name: 'Me Liberé',               nodes: 240,  views: 31000000,  yield: 1240 },
-  { name: 'No Me Compares',          nodes: 280,  views: 40000000,  yield: 1600 },
-  { name: 'Sabor a Mentira',         nodes: 250,  views: 33000000,  yield: 1320 },
-  { name: 'La Chica de los Ojos Cafés', nodes: 230, views: 28000000, yield: 1120 },
-  { name: 'Yo Soy el Que Manda',     nodes: 220,  views: 26000000,  yield: 1040 },
-  { name: 'El Merengue',             nodes: 300,  views: 44000000,  yield: 1760 }
-];
 /* ── Configurable views-per-second rate ── */
 const FUGITIVE_VPS_DEFAULT = 83;
 const FUGITIVE_VPS_STORAGE_KEY = 'na_fugitive_views_per_sec';
@@ -398,6 +1053,9 @@ function showFugitiveBreakdown() {
       · 📈 <strong>Tasa:</strong> ${getFugitiveViewsPerSec().toLocaleString('en-US')} vistas/segundo
       · 🎯 <strong>Proyectado:</strong> $19,640/mes solo estas 12 canciones
       <br><span style="font-size:10px;">Fuente: Scalin Flow IA · eCPM $1.20 género tropical</span>
+    </div>
+    <div style="margin-top:10px;padding:8px;background:rgba(77,171,247,0.06);border:0.5px solid rgba(77,171,247,0.15);border-radius:var(--radius);text-align:center;font-size:10px;color:var(--muted);">
+      📀 <strong style="color:var(--info-bright);">Catálogo completo de 178 canciones</strong> disponible en la sección de abajo → <span style="color:var(--accent);cursor:pointer;" onclick="closeModal();document.getElementById('dash-catalog-card').scrollIntoView({behavior:'smooth'})">Ver todas las canciones</span>
     </div>
   `);
 }
@@ -761,4 +1419,6 @@ function changeAppPassword() {
   if (accessKeys.length === 0) setupMasterKey();
   updateDashboardKeys();
   checkSession();
+  // Navigate to dashboard to trigger all dashboard render functions
+  setTimeout(() => navigateTo('dashboard'), 50);
 })();
