@@ -255,8 +255,6 @@ class YouTubeScraper:
             print(f"[YouTubeScraper] Error: {e}")
             import traceback
             traceback.print_exc()
-        finally:
-            self.close()
 
         return nodes
 

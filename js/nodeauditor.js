@@ -296,11 +296,51 @@ function auditAllArtistSongs() {
   const songs = naState.artistSongs;
   if (!songs || songs.length === 0) return;
 
-  // Tomar las primeras N canciones para auditar (limitado a 20 para no saturar)
   const toAudit = songs.slice(0, Math.min(20, songs.length));
+  const btn = document.getElementById('na-search-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Auditando catálogo...'; }
+
+  // Si tiene datos reales activados, llamar a la API batch
+  if (naState.useRealData) {
+    const payload = {
+      songs: toAudit.map(s => ({ name: s.name })),
+      max_nodes_per_song: Math.min(20, naState.maxNodes),
+      cpm: naState.cpm
+    };
+
+    fetch(naState.apiBaseUrl + '/api/audit/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(120000) // 2 min timeout
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'success') {
+          naState.nodes = data.nodes.map(n => ({ ...n, selected: true }));
+          naState.filteredNodes = [...naState.nodes];
+          naState.targetSong = { name: toAudit.length + ' canciones del catálogo' };
+          renderResults();
+          showNodesReady(naState.targetSong);
+        }
+      })
+      .catch(err => {
+        console.error('Batch API error:', err);
+        alert('Error conectando al backend. Usando datos simulados.');
+        generateMockBatch(toAudit);
+      })
+      .finally(() => {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Iniciar Extracción'; }
+      });
+  } else {
+    generateMockBatch(toAudit);
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Iniciar Extracción'; }
+  }
+}
+
+function generateMockBatch(toAudit) {
   let allNodes = [];
   let nodeId = 1;
-
   toAudit.forEach(s => {
     const songNodes = generateNodesForSong(
       { name: s.name, nodes: s.nodes || 50, views: s.views || 1000000, yield: 0, audited: false, catalogId: s.catalogId, catalogName: s.catalogName },
@@ -312,7 +352,6 @@ function auditAllArtistSongs() {
       allNodes.push(n);
     });
   });
-
   naState.nodes = allNodes;
   naState.filteredNodes = [...allNodes];
   naState.targetSong = { name: toAudit.length + ' canciones de ' + (naState.targetArtist?.name || 'artista') };

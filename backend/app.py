@@ -119,24 +119,27 @@ def audit_batch():
     node_id = 1
     errors = []
 
-    for song in songs:
-        try:
-            logger.info(f"Auditando canción: '{song['name']}'")
-            scraper = YouTubeScraper(headless=True, timeout=15)
-            nodes = scraper.search_song(song['name'], max_results=max_per)
+    scraper = YouTubeScraper(headless=True, timeout=20)
+    try:
+        for song in songs:
+            try:
+                logger.info(f"Auditando canción: '{song['name']}'")
+                nodes = scraper.search_song(song['name'], max_results=max_per)
 
-            for n in nodes:
-                n['id'] = node_id
-                n['songName'] = song['name']
-                n['est_usd_per_hour'] = round((n['vph'] * cpm) / 1000, 6)
-                n['type'] = 'pirate' if n['isPirate'] else ('official' if n['isOfficial'] else 'cover')
-                n['typeLabel'] = '🏴‍☠️ Pirata' if n['isPirate'] else ('Oficial' if n['isOfficial'] else 'Cover')
-                node_id += 1
-                all_nodes.append(n)
+                for n in nodes:
+                    n['id'] = node_id
+                    n['songName'] = song['name']
+                    n['est_usd_per_hour'] = round((n['vph'] * cpm) / 1000, 6)
+                    n['type'] = 'pirate' if n['isPirate'] else ('official' if n['isOfficial'] else 'cover')
+                    n['typeLabel'] = '🏴‍☠️ Pirata' if n['isPirate'] else ('Oficial' if n['isOfficial'] else 'Cover')
+                    node_id += 1
+                    all_nodes.append(n)
 
-        except Exception as e:
-            errors.append({'song': song['name'], 'error': str(e)})
-            continue
+            except Exception as e:
+                errors.append({'song': song['name'], 'error': str(e)})
+                continue
+    finally:
+        scraper.close()
 
     return jsonify({
         'status': 'success',
