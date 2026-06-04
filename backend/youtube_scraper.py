@@ -127,14 +127,22 @@ class YouTubeScraper:
         self.headless = headless
 
     def _init_driver(self):
-        """Inicializa el WebDriver de Chrome."""
+        """Inicializa el WebDriver de Chrome optimizado para baja memoria."""
         options = Options()
         if self.headless:
             options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
         options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1400,900')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-background-networking')
+        options.add_argument('--disable-sync')
+        options.add_argument('--disable-translate')
+        options.add_argument('--disable-default-apps')
+        options.add_argument('--mute-audio')
+        options.add_argument('--no-first-run')
+        options.add_argument('--js-flags=--max-old-space-size=256')
+        options.add_argument('--window-size=1280,720')
         options.add_argument('--lang=es')
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                              'AppleWebKit/537.36 (KHTML, like Gecko) '
@@ -151,10 +159,16 @@ class YouTubeScraper:
             self.driver = webdriver.Chrome(service=service, options=options)
             self.driver.set_page_load_timeout(self.timeout)
         except Exception as e:
+            print(f"[Chrome] Error con ChromeDriverManager: {e}")
             try:
                 self.driver = webdriver.Chrome(options=options)
             except Exception as e2:
-                raise RuntimeError(f"No se pudo iniciar ChromeDriver: {e}\n{e2}")
+                # Último intento: buscar chromedriver en PATH
+                try:
+                    from selenium.webdriver.chrome.service import Service as BaseService
+                    self.driver = webdriver.Chrome(service=BaseService(), options=options)
+                except Exception as e3:
+                    raise RuntimeError(f"No se pudo iniciar ChromeDriver: {e2}\n{e3}")
 
     # ─────────────────────────────────────────────
     #  EXTRACCIÓN DESDE ytInitialData (JSON)
