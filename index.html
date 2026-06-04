@@ -33,27 +33,7 @@
         <span class="nav-icon">💰</span> Cotizador
       </button>
 
-      <div class="nav-section-label">Catálogos</div>
-      <button class="nav-item" data-section="jlg" onclick="navigateTo('jlg')">
-        <span class="nav-icon">🎸</span> JLG 440
-        <span class="nav-badge">16</span>
-      </button>
-      <button class="nav-item" data-section="milly" onclick="navigateTo('milly')">
-        <span class="nav-icon">👑</span> Milly Q.
-        <span class="nav-badge">3</span>
-      </button>
-      <button class="nav-item" data-section="villalona" onclick="navigateTo('villalona')">
-        <span class="nav-icon">🎤</span> Villalona
-        <span class="nav-badge">3</span>
-      </button>
-      <button class="nav-item" data-section="vargas" onclick="navigateTo('vargas')">
-        <span class="nav-icon">🌍</span> Vargas
-        <span class="nav-badge">3</span>
-      </button>
-      <button class="nav-item" data-section="multiartist" onclick="navigateTo('multiartist')">
-        <span class="nav-icon">📀</span> Multi-artista
-        <span class="nav-badge">ALL</span>
-      </button>
+      
 
       <div class="nav-section-label">Herramientas</div>
       <button class="nav-item" data-section="nodeauditor" onclick="navigateTo('nodeauditor')">
@@ -178,6 +158,7 @@
             </div>
             <div id="dash-fugitive-rate" style="font-size:10px;color:var(--muted);margin-top:3px;">🔴 83 vistas/seg</div>
             <div id="dash-fugitive-session" style="font-size:9px;color:var(--muted2);margin-top:1px;"></div>
+            <div id="dash-fugitive-timestamp" style="font-size:8px;color:var(--muted2);margin-top:1px;"></div>
 
             <div class="income-chart">
               <div class="bar-row">
@@ -206,6 +187,7 @@
           </div>
           <div id="dash-shorts-vpd" style="font-size:10px;color:var(--muted);margin-top:3px;">📈 — vistas/día combinadas</div>
           <div id="dash-shorts-usd" style="font-size:10px;color:var(--muted2);margin-top:1px;">💰 — USD/h en Shorts</div>
+          <div id="dash-shorts-timestamp" style="font-size:8px;color:var(--muted2);margin-top:1px;"></div>
           <div style="margin-top:8px;display:flex;gap:3px;height:24px;align-items:flex-end;" id="dash-shorts-bar-chart">
             <div style="flex:1;height:0%;background:var(--bg4);border-radius:2px 2px 0 0;"></div>
           </div>
@@ -405,50 +387,15 @@
         <div id="cotizador-container"></div>
       </div>
 
-      <!-- ═══ JLG 440 ═══ -->
-      <div class="section" id="section-jlg">
-        <div class="page-header">
-          <h1>🎸 Juan Luis Guerra 440</h1>
-          <p>Catálogo auditado · 16 canciones principales · 4 catálogos</p>
-        </div>
-        <div id="jlg-container"></div>
-      </div>
+      
 
-      <!-- ═══ MILLY QUEZADA ═══ -->
-      <div class="section" id="section-milly">
-        <div class="page-header">
-          <h1>👑 Milly Quezada</h1>
-          <p>Catálogo auditado · 3 canciones principales · Reina del Merengue</p>
-        </div>
-        <div id="milly-container"></div>
-      </div>
+      
 
-      <!-- ═══ FERNANDO VILLALONA ═══ -->
-      <div class="section" id="section-villalona">
-        <div class="page-header">
-          <h1>🎤 Fernando Villalona</h1>
-          <p>Catálogo auditado · 3 canciones principales · El Mayimbe</p>
-        </div>
-        <div id="villalona-container"></div>
-      </div>
+      
 
-      <!-- ═══ WILFRIDO VARGAS ═══ -->
-      <div class="section" id="section-vargas">
-        <div class="page-header">
-          <h1>🌍 Wilfrido Vargas</h1>
-          <p>Catálogo auditado · 3 canciones principales · Merengue Internacional</p>
-        </div>
-        <div id="vargas-container"></div>
-      </div>
+      
 
-      <!-- ═══ MULTI-ARTISTA ═══ -->
-      <div class="section" id="section-multiartist">
-        <div class="page-header">
-          <h1>📀 Catálogo Multi-Artista</h1>
-          <p>Vista consolidada de todos los artistas auditados · 425+ canciones</p>
-        </div>
-        <div id="multiartist-container"></div>
-      </div>
+      
 
       <!-- ═══ NODE AUDITOR ═══ -->
       <div class="section" id="section-nodeauditor">

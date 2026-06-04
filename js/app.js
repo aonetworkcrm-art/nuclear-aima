@@ -85,12 +85,7 @@ function navigateTo(section) {
     cotizador: ['Cotizador', 'Scaling Flow IA · Servicios Instagram'],
     nodeauditor: ['Node Auditor', 'Auditoría Forense de Nodos Musicales'],
     tools: ['Herramientas', 'Shadow Audit · Copy Generator'],
-    admin: ['Administración', 'Configuración del sistema'],
-    jlg: ['JLG 440', 'Juan Luis Guerra · 16 canciones auditadas'],
-    milly: ['Milly Quezada', 'Reina del Merengue · 3 canciones auditadas'],
-    villalona: ['Fernando Villalona', 'El Mayimbe · 3 canciones auditadas'],
-    vargas: ['Wilfrido Vargas', 'Merengue Internacional · 3 canciones auditadas'],
-    multiartist: ['Multi-Artista', 'Consolidado de todos los catálogos auditados']
+    admin: ['Administración', 'Configuración del sistema']
   };
   const t = titles[section] || ['Nuclear AIMA', ''];
   document.getElementById('topbar-title').textContent = t[0];
@@ -107,11 +102,6 @@ function navigateTo(section) {
   else if (section === 'nodeauditor') renderNodeAuditor();
   else if (section === 'tools') renderTools();
   else if (section === 'admin') renderAdmin();
-  else if (section === 'jlg') renderArtistSection('jlg');
-  else if (section === 'milly') renderArtistSection('milly');
-  else if (section === 'villalona') renderArtistSection('villalona');
-  else if (section === 'vargas') renderArtistSection('vargas');
-  else if (section === 'multiartist') renderMultiArtist();
   else if (section === 'dashboard') {
     updateDashboardKeys();
     updateChecklistProgress();
@@ -787,57 +777,6 @@ const ALBUM_16 = ['Crónicas del Día a Día','El Baile de la Vida','Volver a Em
 // Álbum 17: Sencillos de la Nueva Era (2022-2026)
 const ALBUM_17 = ['El Tiki Tiki del Amor','Aunque No Quisieran','El Merengue Vive','Colaboración de Oro','Piano Moderno','Ritmo de la Nueva Ola','Sencillo de Corazón','Amor Digital','Mambo 2026','Raíces y Futuro','El Legado Sigue','Canto de Oro (Final de Antología)'];
 
-/* ══════════════════════════════════════════════
-   JUAN LUIS GUERRA 440 — Canciones por Álbum
-   ══════════════════════════════════════════════ */
-
-// Álbum 1: Soplando (1984)
-const JLG_ALBUM_1 = ['Soplando','El Hombre de la Tierra','Amor de Conuco','La Cosquillita','Ojalá Que Llueva Café (versión temprana)','Sabor a Coco','Mi Tierra','El Piano de Juan','Ritmo de Mi Pueblo','Los Pueblos Se Levantan'];
-// Álbum 2: Mudanza y Acarreo (1985)
-const JLG_ALBUM_2 = ['Mudanza y Acarreo','La Bilirrubina','Bachata Rosa (demo)','Señor Cantante','A Pedir Su Mano','Ay Mujer','El Farolito','Carta de Amor','Frío Frío','Corazón de Madera'];
-// Álbum 3: Mientras Más Lo Pienso...Tú (1987)
-const JLG_ALBUM_3 = ['Mientras Más Lo Pienso...Tú','Woman del Callao','Amor de Madre','De Tu Boca','Guarocuya','Donde el Viento Nos Lleve','Sueño Contigo','Ven a Mi Mesa','El Hombre de la Naturaleza','Río Abajo'];
-// Álbum 4: Ojalá Que Llueva Café (1989)
-const JLG_ALBUM_4 = ['Ojalá Que Llueva Café','Visa Para un Sueño','La Llave de Mi Corazón','Reina de la Noche','Carmen','El Amor de la Mujer','La Costurera','José y Pedro','Ayer la Vi','Naturaleza de Amor','Los Pájaros Cantan'];
-// Álbum 5: Bachata Rosa (1990) — EL CLÁSICO
-const JLG_ALBUM_5 = ['Bachata Rosa','Burbujas de Amor','A Pedir Su Mano','Carta de Amor','Rosalía','El Farolito','La Bilirrubina','Señora de Madera','Como Abeja al Panal','Cuando Te Beso','Cancioncita de Amor','Estrellitas y Duendes'];
-// Álbum 6: Areíto (1992)
-const JLG_ALBUM_6 = ['El Costo de la Vida','Naboría','Si Dios Fuera Negro','Coronación de Flores','Frío Frío','Popurrí de Bachata','Los Pueblos Se Levantan','El Tiempo','La Mujer de Mi Vida','San Vito','Patria','Ojalá Que Llueva Café (Remix)'];
-// Álbum 7: Fogaraté (1994)
-const JLG_ALBUM_7 = ['Fogaraté','El Beso de la Ciguapa','La Hormiguita','Viviré','Amor de Amor','Los Pájaros Perdidos','Sobrepasa','Mi amor','Silencio','La Noche'];
-// Álbum 8: Ni Es Lo Mismo Ni Es Igual (1998)
-const JLG_ALBUM_8 = ['Ni Es Lo Mismo Ni Es Igual','El Príncipe','Mi Bendición','Palomita Blanca','Píntame','Amor de la Mujer','Quisiera','Testimonio','Los Dos','Sueño de Amor'];
-// Álbum 9: Para Ti (2004)
-const JLG_ALBUM_9 = ['Para Ti','Las Avispas','La Calle','El Ángel de la Guarda','Corazón y Fuego','Los Recuerdos','Amanece','Todo Es Posible','Dame Luz','Cristal de Amor'];
-// Álbum 10: La Llave de Mi Corazón (2007)
-const JLG_ALBUM_10 = ['La Llave de Mi Corazón','Que Me Den la Visa','Todo Tiene Su Hora','La Travesía','El Amor de Dios','Cristiana','Soldado','En el Cielo','Mi País','Gloria a Dios','La Noche de los Dos'];
-// Álbum 11: Colección Cristiana (2012)
-const JLG_ALBUM_11 = ['El Amor de Dios','Eres Tú Jesús','Gloria a Ti','Mi Compañero Fiel','Santo Espíritu','Alabanza Eterna','Te Alabaré','Dulce Presencia','Fe y Esperanza','Mi Fe','Bendito Seas'];
-// Álbum 12: Todo Tiene Su Hora (2014)
-const JLG_ALBUM_12 = ['Todo Tiene Su Hora','Lere Lere','El Capotillo','Canto a la Vida','Para Qué Sufrir','Los Dos Amores','La Paz de Dios','Yo Bailo Con Ella','Tus Ojos','Amor de Todos','Ven a Mi'];
-// Álbum 13: Radio Güira (2023)
-const JLG_ALBUM_13 = ['Radio Güira','Mambo 23','La Gracia de Dios','El Farolito (Remix)','Bachata Rosa 2023','Los Libros de la Buena Memoria','Algodón de Azúcar','Burbujas de Amor (Acústico)','La Bilirrubina (Sinfónico)','Dulce Veneno','Mil Preguntas'];
-
-/* ══════════════════════════════════════════════
-   MILLY QUEZADA — Canciones por Álbum
-   ══════════════════════════════════════════════ */
-
-const MQ_ALBUM_1 = ['La Reina del Merengue','Eras','Lo Que Más Me Gusta de Ti','Quiero Amanecer','El Hombre de Tu Vida','Sé Que No','Aprenderé','No Hace Falta Nada','Al Final','Vete y Pregona','Luz de Mi Vida','Hoy Te Confieso','Lluvia de Amor'];
-const MQ_ALBUM_2 = ['Volvió Juanita','Una Vez Más','Me Muero','De Mí','Cómo Será','Déjame','Si No Te Tengo','La Mujer Que Habla','Bendito Amor',"Pa' Qué Me Sirve",'Te Necesito','Amor Secreto'];
-
-/* ══════════════════════════════════════════════
-   FERNANDO VILLALONA — Canciones por Álbum
-   ══════════════════════════════════════════════ */
-
-const FV_ALBUM_1 = ['El Mayimbe','La Quiero a Ella','Celos','Dime','Amor de Cristal','El Pequeño Músico','Quisiera Ser','Ay Doctor','No Me Extraña Nada','Te Amo','Corazón de Madera'];
-const FV_ALBUM_2 = ['Mi Mujer','Copas de Licor','Vete','Yo Soy el Hombre','Por Cobardía','Te Extraño','La Última Noche','Ritmo de Mi Pueblo','Dime Que Sí','Agua de Amor','Canto a Mi Patria'];
-
-/* ══════════════════════════════════════════════
-   WILFRIDO VARGAS — Canciones por Álbum
-   ══════════════════════════════════════════════ */
-
-const WV_ALBUM_1 = ['El Jardinero','Amanecer','Abusadora','El Loco','La Medicina','Barbarazo','El Papelito Blanco','Baile del Suá Suá','El Año Viejo','El Músico','Playas de Mi Tierra','Los Cangrejos'];
-const WV_ALBUM_2 = ['Cobarde','El Comején','El Motor','La Chacabana','Las Mujeres','Mambo','Merengue Internacional','Más Que un Hombre','No Te Quiero','Pechito de Hierro','María','El Merengón'];
 
 /* ── Helper: asigna yield según popularidad ── */
 function getYieldByPopularity(views) {
@@ -874,49 +813,9 @@ const RO_AUDITED = [
   { name: 'América Sin Queja',       nodes: 600,  views: 32000000,  yield: 1280, cat: 'RO-02' }
 ];
 
-// Juan Luis Guerra 440
-const JLG_AUDITED = [
-  { name: 'Bachata Rosa',               nodes: 2800, views: 180000000, yield: 7200, cat: 'JLG-01' },
-  { name: 'Burbujas de Amor',           nodes: 3200, views: 250000000, yield: 10000, cat: 'JLG-01' },
-  { name: 'Ojalá Que Llueva Café',      nodes: 1800, views: 120000000, yield: 4800, cat: 'JLG-01' },
-  { name: 'La Bilirrubina',             nodes: 2000, views: 140000000, yield: 5600, cat: 'JLG-01' },
-  { name: 'A Pedir Su Mano',            nodes: 1200, views: 85000000,  yield: 3400, cat: 'JLG-01' },
-  { name: 'El Farolito',                nodes: 900,  views: 65000000,  yield: 2600, cat: 'JLG-01' },
-  { name: 'Fogaraté',                   nodes: 800,  views: 55000000,  yield: 2200, cat: 'JLG-02' },
-  { name: 'Ni Es Lo Mismo Ni Es Igual', nodes: 750,  views: 50000000,  yield: 2000, cat: 'JLG-02' },
-  { name: 'Visa Para un Sueño',         nodes: 700,  views: 48000000,  yield: 1920, cat: 'JLG-01' },
-  { name: 'La Llave de Mi Corazón',     nodes: 650,  views: 42000000,  yield: 1680, cat: 'JLG-03' },
-  { name: 'Todo Tiene Su Hora',         nodes: 600,  views: 38000000,  yield: 1520, cat: 'JLG-03' },
-  { name: 'Las Avispas',                nodes: 550,  views: 35000000,  yield: 1400, cat: 'JLG-02' },
-  { name: 'El Costo de la Vida',        nodes: 500,  views: 32000000,  yield: 1280, cat: 'JLG-02' },
-  { name: 'Para Ti',                    nodes: 480,  views: 30000000,  yield: 1200, cat: 'JLG-03' },
-  { name: 'Estrellitas y Duendes',      nodes: 450,  views: 28000000,  yield: 1120, cat: 'JLG-01' },
-  { name: 'Radio Güira',                nodes: 600,  views: 40000000,  yield: 1600, cat: 'JLG-04' }
-];
-
-// Milly Quezada
-const MQ_AUDITED = [
-  { name: 'Eras',                       nodes: 600,  views: 40000000,  yield: 1600, cat: 'MQ-01' },
-  { name: 'Volvió Juanita',             nodes: 450,  views: 32000000,  yield: 1280, cat: 'MQ-01' },
-  { name: 'Lo Que Más Me Gusta de Ti',  nodes: 400,  views: 28000000,  yield: 1120, cat: 'MQ-01' }
-];
-
-// Fernando Villalona
-const FV_AUDITED = [
-  { name: 'El Mayimbe',                 nodes: 500,  views: 35000000,  yield: 1400, cat: 'FV-01' },
-  { name: 'La Quiero a Ella',           nodes: 380,  views: 25000000,  yield: 1000, cat: 'FV-01' },
-  { name: 'Celos',                      nodes: 350,  views: 22000000,  yield: 880,  cat: 'FV-01' }
-];
-
-// Wilfrido Vargas
-const WV_AUDITED = [
-  { name: 'El Jardinero',               nodes: 700,  views: 48000000,  yield: 1920, cat: 'WV-01' },
-  { name: 'Abusadora',                  nodes: 550,  views: 38000000,  yield: 1520, cat: 'WV-01' },
-  { name: 'Amanecer',                   nodes: 500,  views: 35000000,  yield: 1400, cat: 'WV-01' }
-];
 
 // Combinado para compatibilidad con FULL_CATALOG
-const AUDITED_SONGS = [...RO_AUDITED, ...JLG_AUDITED, ...MQ_AUDITED, ...FV_AUDITED, ...WV_AUDITED];
+const AUDITED_SONGS = [...RO_AUDITED];
 
 /* ── FULL_CATALOG — 6+ catálogos con canciones reales ── */
 const FULL_CATALOG = [
@@ -1011,128 +910,8 @@ const FULL_CATALOG = [
       ...makeSongBatch(ALBUM_17, 5000000, 75, 'RO-06')
     ]
   },
-  // ══════════════════════════════════════════════
-  //  JUAN LUIS GUERRA 440
-  // ══════════════════════════════════════════════
-  {
-    id: 'JLG-01',
-    name: 'Juan Luis Guerra · Bachata Rosa Época',
-    period: '1984-1992',
-    description: 'Álbumes 1-6 · Soplando a Areíto · La era dorada',
-    color: '#f0c040',
-    bgColor: '#1a2a0a',
-    icon: '🎸',
-    songCount: 65,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-01'),
-    estimatedSongs: [
-      ...makeSongBatch(JLG_ALBUM_1, 8000000, 100, 'JLG-01'),
-      ...makeSongBatch(JLG_ALBUM_2, 10000000, 120, 'JLG-01'),
-      ...makeSongBatch(JLG_ALBUM_3, 12000000, 140, 'JLG-01'),
-      ...makeSongBatch(JLG_ALBUM_4, 15000000, 180, 'JLG-01'),
-      ...makeSongBatch(JLG_ALBUM_5, 25000000, 300, 'JLG-01'),
-      ...makeSongBatch(JLG_ALBUM_6, 18000000, 200, 'JLG-01')
-    ]
-  },
-  {
-    id: 'JLG-02',
-    name: 'Juan Luis Guerra · Merengue Moderno',
-    period: '1994-2004',
-    description: 'Álbumes 7-9 · Fogaraté · Ni Es Lo Mismo · Para Ti',
-    color: '#2ecc71',
-    bgColor: '#0a2a1a',
-    icon: '🎺',
-    songCount: 32,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-02'),
-    estimatedSongs: [
-      ...makeSongBatch(JLG_ALBUM_7, 14000000, 160, 'JLG-02'),
-      ...makeSongBatch(JLG_ALBUM_8, 12000000, 140, 'JLG-02'),
-      ...makeSongBatch(JLG_ALBUM_9, 10000000, 120, 'JLG-02')
-    ]
-  },
-  {
-    id: 'JLG-03',
-    name: 'Juan Luis Guerra · Baladas y Cristiano',
-    period: '2007-2014',
-    description: 'Álbumes 10-12 · La Llave · Colección Cristiana · Todo Tiene Su Hora',
-    color: '#7db8e8',
-    bgColor: '#0a1a2a',
-    icon: '🙏',
-    songCount: 33,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-03'),
-    estimatedSongs: [
-      ...makeSongBatch(JLG_ALBUM_10, 9000000, 100, 'JLG-03'),
-      ...makeSongBatch(JLG_ALBUM_11, 5000000, 60, 'JLG-03'),
-      ...makeSongBatch(JLG_ALBUM_12, 8000000, 90, 'JLG-03')
-    ]
-  },
-  {
-    id: 'JLG-04',
-    name: 'Juan Luis Guerra · 440 Contemporáneo',
-    period: '2023',
-    description: 'Álbum 13: Radio Güira · La nueva era 440',
-    color: '#ff6b4a',
-    bgColor: '#2a1a0a',
-    icon: '📻',
-    songCount: 11,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-04'),
-    estimatedSongs: makeSongBatch(JLG_ALBUM_13, 12000000, 150, 'JLG-04')
-  },
-  // ══════════════════════════════════════════════
-  //  MILLY QUEZADA
-  // ══════════════════════════════════════════════
-  {
-    id: 'MQ-01',
-    name: 'Milly Quezada · Reina del Merengue',
-    period: '1985-2005',
-    description: 'Los grandes éxitos de la Reina del Merengue',
-    color: '#e87d9e',
-    bgColor: '#2a0a1a',
-    icon: '👑',
-    songCount: 25,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'MQ-01'),
-    estimatedSongs: [
-      ...makeSongBatch(MQ_ALBUM_1, 6000000, 80, 'MQ-01'),
-      ...makeSongBatch(MQ_ALBUM_2, 4500000, 60, 'MQ-01')
-    ]
-  },
-  // ══════════════════════════════════════════════
-  //  FERNANDO VILLALONA
-  // ══════════════════════════════════════════════
-  {
-    id: 'FV-01',
-    name: 'Fernando Villalona · El Mayimbe',
-    period: '1980-2000',
-    description: 'Grandes éxitos del Mayimbe dominicano',
-    color: '#b87de8',
-    bgColor: '#1a0a2a',
-    icon: '🎤',
-    songCount: 22,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'FV-01'),
-    estimatedSongs: [
-      ...makeSongBatch(FV_ALBUM_1, 5000000, 70, 'FV-01'),
-      ...makeSongBatch(FV_ALBUM_2, 4000000, 55, 'FV-01')
-    ]
-  },
-  // ══════════════════════════════════════════════
-  //  WILFRIDO VARGAS
-  // ══════════════════════════════════════════════
-  {
-    id: 'WV-01',
-    name: 'Wilfrido Vargas · Merengue Internacional',
-    period: '1980-2000',
-    description: 'El rey del merengue internacional · +12 éxitos',
-    color: '#5c8ce0',
-    bgColor: '#0a1a2a',
-    icon: '🌍',
-    songCount: 24,
-    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'WV-01'),
-    estimatedSongs: [
-      ...makeSongBatch(WV_ALBUM_1, 7000000, 90, 'WV-01'),
-      ...makeSongBatch(WV_ALBUM_2, 5500000, 75, 'WV-01')
-    ]
-  }
+  
 ];
-
 
 
 // Compute all songs from FULL_CATALOG for easy access
@@ -1178,10 +957,6 @@ const FUGITIVE_SONGS = RO_AUDITED.map(s => ({
 }));
 const FUGITIVE_BASE_VIEWS = RO_AUDITED.reduce((a, s) => a + s.views, 0);
 
-// Helper: obtener canciones auditadas de un artista específico
-function getArtistAudited(artistPrefix) {
-  return AUDITED_SONGS.filter(s => s.cat.startsWith(artistPrefix));
-}
 const FUGITIVE_REVENUE_PER_VIEW = CATALOG_REVENUE_PER_VIEW;
 
 /* ── Real-Time Fugitive Views Counter ── */
@@ -1544,6 +1319,11 @@ function startFugitiveCounter() {
   // Animar barras al iniciar
   animateIncomeBars();
 
+  _fugitiveLastUpdate = Date.now();
+  var tsEl = document.getElementById('dash-fugitive-timestamp');
+  if (tsEl) tsEl.textContent = formatTrendingTimestamp(_fugitiveLastUpdate);
+  startFugitiveTimer();
+
   updateCounter();
   fugitiveInterval = setInterval(updateCounter, 1000);
 }
@@ -1570,6 +1350,8 @@ window.navigateTo = function(section) {
     startFugitiveCounter();
   } else {
     stopFugitiveCounter();
+    stopFugitiveTimer();
+    stopShortsTimer();
   }
   // Call original navigateTo
   origNavigateTo(section);
@@ -1622,156 +1404,8 @@ function changeAppPassword() {
   setTimeout(() => { if (status) status.textContent = ''; }, 3000);
 }
 
-/* ── Render Artist Section (JLG, Milly, Villalona, Vargas) ── */
-function renderArtistSection(artistKey) {
-  const container = document.getElementById(artistKey + '-container');
-  if (!container) return;
-
-  const ARTIST_MAP = {
-    jlg: { name: 'Juan Luis Guerra 440', icon: '🎸', color: '#f0c040', bgColor: '#1a2a0a', audited: JLG_AUDITED, cats: ['JLG-01','JLG-02','JLG-03','JLG-04'] },
-    milly: { name: 'Milly Quezada', icon: '👑', color: '#e87d9e', bgColor: '#2a0a1a', audited: MQ_AUDITED, cats: ['MQ-01'] },
-    villalona: { name: 'Fernando Villalona', icon: '🎤', color: '#b87de8', bgColor: '#1a0a2a', audited: FV_AUDITED, cats: ['FV-01'] },
-    vargas: { name: 'Wilfrido Vargas', icon: '🌍', color: '#5c8ce0', bgColor: '#0a1a2a', audited: WV_AUDITED, cats: ['WV-01'] }
-  };
-
-  const artist = ARTIST_MAP[artistKey];
-  if (!artist) return;
-
-  const songs = artist.audited;
-  const totalViews = songs.reduce((a, s) => a + s.views, 0);
-  const totalYield = songs.reduce((a, s) => a + s.yield, 0);
-  const totalNodes = songs.reduce((a, s) => a + s.nodes, 0);
-
-  const songRows = songs.map(s => `
-    <div class="catalog-song-item">
-      <span class="csi-name"><strong>${s.name}</strong></span>
-      <span class="csi-nodes">${s.nodes.toLocaleString('en-US')}</span>
-      <span class="csi-views">${formatViewsShort(s.views)}</span>
-      <span class="csi-yield" style="color:${artist.color};">$${s.yield.toLocaleString('en-US')}/mo</span>
-    </div>
-  `).join('');
-
-  container.innerHTML = `
-    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius2);padding:20px;">
-      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
-        <div style="font-size:32px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:${artist.bgColor};color:${artist.color};border-radius:var(--radius);">${artist.icon}</div>
-        <div>
-          <h2 style="margin:0;font-size:18px;font-weight:500;">${artist.name}</h2>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${songs.length} canciones auditadas · ${formatViewsShort(totalViews)} vistas · ${formatMoneyCompact(totalYield)}/mes proyectado</div>
-        </div>
-      </div>
-
-      <div class="catalog-card-body" style="border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-        <div style="font-size:10px;padding:8px 16px;color:var(--muted2);display:flex;gap:16px;background:var(--bg3);border-bottom:0.5px solid var(--border);">
-          <span style="flex:1;">Canción</span>
-          <span style="width:60px;text-align:right;">Nodos</span>
-          <span style="width:70px;text-align:right;">Vistas</span>
-          <span style="width:80px;text-align:right;">Yield/mes</span>
-        </div>
-        <div class="catalog-song-list">${songRows}</div>
-        <div class="catalog-total-row">
-          <span>Total ${songs.length} canciones</span>
-          <span style="color:var(--text2);">${totalNodes.toLocaleString('en-US')} nodos</span>
-          <span style="color:var(--text2);">${formatViewsShort(totalViews)}</span>
-          <span style="color:${artist.color};">${formatMoneyCompact(totalYield)}/mo</span>
-        </div>
-      </div>
-
-      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
-        ${artist.cats.map(catId => {
-          const cat = FULL_CATALOG.find(c => c.id === catId);
-          if (!cat) return '';
-          const catSongs = ALL_CATALOG_SONGS.filter(s => s.catalogId === catId);
-          const catYield = catSongs.reduce((a, s) => a + s.yield, 0);
-          return `
-            <div style="flex:1;min-width:180px;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px;">
-              <div style="font-size:11px;font-weight:600;color:${cat.color};">${cat.icon} ${cat.id} · ${cat.name}</div>
-              <div style="font-size:10px;color:var(--muted);margin-top:4px;">${catSongs.length} canciones · ${cat.period || ''}</div>
-              <div style="font-size:11px;color:${cat.color};margin-top:4px;">${formatMoneyCompact(catYield)}/mo</div>
-            </div>
-          `;
-        }).join('')}
-      </div>
-    </div>
-  `;
-}
-
-/* ── Render Multi-Artista Consolidado ── */
-let multiArtistTab = 'all';
-
-function renderMultiArtist() {
-  const container = document.getElementById('multiartist-container');
-  if (!container) return;
-
-  const tabs = [
-    { id: 'all', label: '📀 Todos', color: 'var(--accent)' },
-    { id: 'RO', label: '🎷 Ramón Orlando', color: '#f0c040' },
-    { id: 'JLG', label: '🎸 JLG 440', color: '#f0c040' },
-    { id: 'MQ', label: '👑 Milly Q.', color: '#e87d9e' },
-    { id: 'FV', label: '🎤 Villalona', color: '#b87de8' },
-    { id: 'WV', label: '🌍 Vargas', color: '#5c8ce0' }
-  ];
-
-  let filtered = AUDITED_SONGS;
-  if (multiArtistTab !== 'all') {
-    filtered = AUDITED_SONGS.filter(s => s.cat.startsWith(multiArtistTab));
-  }
-
-  const totalViews = filtered.reduce((a, s) => a + s.views, 0);
-  const totalYield = filtered.reduce((a, s) => a + s.yield, 0);
-  const totalNodes = filtered.reduce((a, s) => a + s.nodes, 0);
-
-  const songRows = filtered.map(s => {
-    const cat = FULL_CATALOG.find(c => c.id === s.cat);
-    const catColor = cat ? cat.color : 'var(--muted)';
-    return `
-      <div class="catalog-song-item">
-        <span class="csi-name"><strong>${s.name}</strong> <span style="font-size:9px;color:var(--muted2);">${s.cat}</span></span>
-        <span class="csi-nodes">${s.nodes.toLocaleString('en-US')}</span>
-        <span class="csi-views">${formatViewsShort(s.views)}</span>
-        <span class="csi-yield" style="color:${catColor};">$${s.yield.toLocaleString('en-US')}/mo</span>
-      </div>
-    `;
-  }).join('');
-
-  const tabHtml = tabs.map(t => `
-    <button class="catalog-filter-tab ${multiArtistTab === t.id ? 'active' : ''}"
-      onclick="multiArtistTab='${t.id}';renderMultiArtist()"
-      style="${multiArtistTab === t.id ? 'border-color:' + t.color + ';color:' + t.color + ';' : ''}">
-      ${t.label}
-    </button>
-  `).join('');
-
-  container.innerHTML = `
-    <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;">${tabHtml}</div>
-
-    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--accent);">${filtered.length}</div><div class="csp-label">Canciones</div></div>
-      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--tomato-light);">${formatViewsShort(totalViews)}</div><div class="csp-label">Vistas</div></div>
-      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--success-bright);">${formatMoneyCompact(totalYield)}/mes</div><div class="csp-label">Yield</div></div>
-      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--info-bright);">${totalNodes.toLocaleString('en-US')}</div><div class="csp-label">Nodos</div></div>
-    </div>
-
-    <div class="catalog-card-body" style="border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
-      <div style="font-size:10px;padding:8px 16px;color:var(--muted2);display:flex;gap:16px;background:var(--bg3);border-bottom:0.5px solid var(--border);">
-        <span style="flex:1;">Canción · Catálogo</span>
-        <span style="width:60px;text-align:right;">Nodos</span>
-        <span style="width:70px;text-align:right;">Vistas</span>
-        <span style="width:80px;text-align:right;">Yield/mes</span>
-      </div>
-      <div class="catalog-song-list">${songRows}</div>
-      <div class="catalog-total-row">
-        <span>Total ${filtered.length} canciones · ${multiArtistTab === 'all' ? 'Todos los artistas' : tabs.find(t => t.id === multiArtistTab)?.label || ''}</span>
-        <span style="color:var(--text2);">${totalNodes.toLocaleString('en-US')} nodos</span>
-        <span style="color:var(--text2);">${formatViewsShort(totalViews)}</span>
-        <span style="color:var(--success-bright);">${formatMoneyCompact(totalYield)}/mo</span>
-      </div>
-    </div>
-  `;
-}
-
 /* ══════════════════════════════════════════════
-   SHORTS DASHBOARD — Métricas Agregadas de Todos los Artistas
+   SHORTS DASHBOARD — Métricas Agregadas
    ══════════════════════════════════════════════ */
 
 let _dashboardShortsCache = null;
@@ -1779,6 +1413,10 @@ let _dashboardShortsCache = null;
 function updateShortsDashboard() {
   // Si hay datos reales del API, intentar cargarlos
   _dashboardShortsCache = null;
+  _shortsLastUpdate = Date.now();
+  var tsEl = document.getElementById('dash-shorts-timestamp');
+  if (tsEl) tsEl.textContent = formatTrendingTimestamp(_shortsLastUpdate);
+  startShortsTimer();
   generateAggregatedShortsData();
   renderShortsCard();
 }
@@ -1910,7 +1548,7 @@ function showShortsBreakdown() {
     <div style="margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6;">
       Shorts virales generados por fans, cuentas de baile y canales virales que utilizan
       las canciones del catálogo sin licencia. Datos agregados de <strong>${AUDITED_SONGS.length} canciones auditadas</strong>
-      de todos los artistas en el sistema.
+      de Ramón Orlando.
     </div>
 
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
@@ -1982,6 +1620,10 @@ let _trendingGenre = 'all';
 let _trendingLastUpdate = 0;
 let _reloadingButton = false;
 let _trendingTimerInterval = null;
+let _fugitiveLastUpdate = 0;
+let _shortsLastUpdate = 0;
+let _fugitiveTimerInterval = null;
+let _shortsTimerInterval = null;
 
 function formatTrendingTimestamp(ts) {
   if (!ts) return '';
@@ -2008,6 +1650,40 @@ function stopTrendingTimer() {
   if (_trendingTimerInterval) {
     clearInterval(_trendingTimerInterval);
     _trendingTimerInterval = null;
+  }
+}
+
+function startFugitiveTimer() {
+  stopFugitiveTimer();
+  _fugitiveTimerInterval = setInterval(function() {
+    var tsEl = document.getElementById('dash-fugitive-timestamp');
+    if (tsEl && _fugitiveLastUpdate > 0) {
+      tsEl.textContent = formatTrendingTimestamp(_fugitiveLastUpdate);
+    }
+  }, 10000);
+}
+
+function stopFugitiveTimer() {
+  if (_fugitiveTimerInterval) {
+    clearInterval(_fugitiveTimerInterval);
+    _fugitiveTimerInterval = null;
+  }
+}
+
+function startShortsTimer() {
+  stopShortsTimer();
+  _shortsTimerInterval = setInterval(function() {
+    var tsEl = document.getElementById('dash-shorts-timestamp');
+    if (tsEl && _shortsLastUpdate > 0) {
+      tsEl.textContent = formatTrendingTimestamp(_shortsLastUpdate);
+    }
+  }, 10000);
+}
+
+function stopShortsTimer() {
+  if (_shortsTimerInterval) {
+    clearInterval(_shortsTimerInterval);
+    _shortsTimerInterval = null;
   }
 }
 

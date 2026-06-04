@@ -1,0 +1,36 @@
+# ── Dependencias ──
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.env
+venv/
+.venv/
+
+# ── Control de versiones ──
+.git/
+.gitignore
+.gitattributes
+
+# ── IDE / Editor ──
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Logs / Temp ──
+*.log
+*.tmp
+*.bak
+
+# ── Docker ──
+Dockerfile
+.dockerignore
+
+# ── Tests / Temp scripts ──
+backend/_remove_artists*.py

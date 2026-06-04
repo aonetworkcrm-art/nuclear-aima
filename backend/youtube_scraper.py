@@ -4,6 +4,7 @@ Motor de raspado de YouTube con Selenium + BeautifulSoup
 Extrae nodos (videos), Shorts del shelf, y datos vía ytInitialData JSON
 """
 
+import os
 import re
 import time
 import math
@@ -139,6 +140,11 @@ class YouTubeScraper:
                              'AppleWebKit/537.36 (KHTML, like Gecko) '
                              'Chrome/120.0.0.0 Safari/537.36')
         options.add_experimental_option('excludeSwitches', ['enable-logging'])
+
+        # Usar CHROME_BIN del entorno (útil en Docker)
+        chrome_bin = os.environ.get('CHROME_BIN', '/usr/bin/google-chrome')
+        if os.path.exists(chrome_bin):
+            options.binary_location = chrome_bin
 
         try:
             service = Service(ChromeDriverManager().install())

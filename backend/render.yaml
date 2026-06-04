@@ -1,17 +1,16 @@
-# Nuclear AIMA — Backend API en Render
+# Nuclear AIMA — Backend API en Render (Docker)
 # https://render.com/docs/deploy-flask
+# Usa Dockerfile en backend/ para instalar Chrome + Selenium
 services:
   - type: web
     name: nuclear-aima-api
-    runtime: python
+    env: docker
     region: oregon
     plan: starter
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 2
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./
     envVars:
       - key: PORT
         value: 10000
       - key: FLASK_ENV
         value: production
-      - key: PYTHON_VERSION
-        value: 3.12.0
