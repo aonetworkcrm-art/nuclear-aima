@@ -679,11 +679,13 @@ function renderFullCatalog() {
   // Update catalog title based on filter
   const titleEl = document.getElementById('dash-catalog-title');
   if (titleEl) {
-    if (catalogFilter === 'all') titleEl.textContent = '178 Canciones';
-    else if (catalogFilter === 'audited') titleEl.textContent = '12 Canciones Auditadas';
+    const totalSongs = ALL_CATALOG_SONGS.length;
+    const auditedCount = ALL_CATALOG_SONGS.filter(s => s.audited).length;
+    if (catalogFilter === 'all') titleEl.textContent = totalSongs + ' Canciones';
+    else if (catalogFilter === 'audited') titleEl.textContent = auditedCount + ' Canciones Auditadas';
     else {
       const cat = FULL_CATALOG.find(c => c.id === catalogFilter);
-      titleEl.textContent = cat ? cat.id + ' · ' + cat.name : '178 Canciones';
+      titleEl.textContent = cat ? cat.id + ' · ' + cat.name : totalSongs + ' Canciones';
     }
   }
 }
@@ -773,6 +775,58 @@ const ALBUM_16 = ['Crónicas del Día a Día','El Baile de la Vida','Volver a Em
 // Álbum 17: Sencillos de la Nueva Era (2022-2026)
 const ALBUM_17 = ['El Tiki Tiki del Amor','Aunque No Quisieran','El Merengue Vive','Colaboración de Oro','Piano Moderno','Ritmo de la Nueva Ola','Sencillo de Corazón','Amor Digital','Mambo 2026','Raíces y Futuro','El Legado Sigue','Canto de Oro (Final de Antología)'];
 
+/* ══════════════════════════════════════════════
+   JUAN LUIS GUERRA 440 — Canciones por Álbum
+   ══════════════════════════════════════════════ */
+
+// Álbum 1: Soplando (1984)
+const JLG_ALBUM_1 = ['Soplando','El Hombre de la Tierra','Amor de Conuco','La Cosquillita','Ojalá Que Llueva Café (versión temprana)','Sabor a Coco','Mi Tierra','El Piano de Juan','Ritmo de Mi Pueblo','Los Pueblos Se Levantan'];
+// Álbum 2: Mudanza y Acarreo (1985)
+const JLG_ALBUM_2 = ['Mudanza y Acarreo','La Bilirrubina','Bachata Rosa (demo)','Señor Cantante','A Pedir Su Mano','Ay Mujer','El Farolito','Carta de Amor','Frío Frío','Corazón de Madera'];
+// Álbum 3: Mientras Más Lo Pienso...Tú (1987)
+const JLG_ALBUM_3 = ['Mientras Más Lo Pienso...Tú','Woman del Callao','Amor de Madre','De Tu Boca','Guarocuya','Donde el Viento Nos Lleve','Sueño Contigo','Ven a Mi Mesa','El Hombre de la Naturaleza','Río Abajo'];
+// Álbum 4: Ojalá Que Llueva Café (1989)
+const JLG_ALBUM_4 = ['Ojalá Que Llueva Café','Visa Para un Sueño','La Llave de Mi Corazón','Reina de la Noche','Carmen','El Amor de la Mujer','La Costurera','José y Pedro','Ayer la Vi','Naturaleza de Amor','Los Pájaros Cantan'];
+// Álbum 5: Bachata Rosa (1990) — EL CLÁSICO
+const JLG_ALBUM_5 = ['Bachata Rosa','Burbujas de Amor','A Pedir Su Mano','Carta de Amor','Rosalía','El Farolito','La Bilirrubina','Señora de Madera','Como Abeja al Panal','Cuando Te Beso','Cancioncita de Amor','Estrellitas y Duendes'];
+// Álbum 6: Areíto (1992)
+const JLG_ALBUM_6 = ['El Costo de la Vida','Naboría','Si Dios Fuera Negro','Coronación de Flores','Frío Frío','Popurrí de Bachata','Los Pueblos Se Levantan','El Tiempo','La Mujer de Mi Vida','San Vito','Patria','Ojalá Que Llueva Café (Remix)'];
+// Álbum 7: Fogaraté (1994)
+const JLG_ALBUM_7 = ['Fogaraté','El Beso de la Ciguapa','La Hormiguita','Viviré','Amor de Amor','Los Pájaros Perdidos','Sobrepasa','Mi amor','Silencio','La Noche'];
+// Álbum 8: Ni Es Lo Mismo Ni Es Igual (1998)
+const JLG_ALBUM_8 = ['Ni Es Lo Mismo Ni Es Igual','El Príncipe','Mi Bendición','Palomita Blanca','Píntame','Amor de la Mujer','Quisiera','Testimonio','Los Dos','Sueño de Amor'];
+// Álbum 9: Para Ti (2004)
+const JLG_ALBUM_9 = ['Para Ti','Las Avispas','La Calle','El Ángel de la Guarda','Corazón y Fuego','Los Recuerdos','Amanece','Todo Es Posible','Dame Luz','Cristal de Amor'];
+// Álbum 10: La Llave de Mi Corazón (2007)
+const JLG_ALBUM_10 = ['La Llave de Mi Corazón','Que Me Den la Visa','Todo Tiene Su Hora','La Travesía','El Amor de Dios','Cristiana','Soldado','En el Cielo','Mi País','Gloria a Dios','La Noche de los Dos'];
+// Álbum 11: Colección Cristiana (2012)
+const JLG_ALBUM_11 = ['El Amor de Dios','Eres Tú Jesús','Gloria a Ti','Mi Compañero Fiel','Santo Espíritu','Alabanza Eterna','Te Alabaré','Dulce Presencia','Fe y Esperanza','Mi Fe','Bendito Seas'];
+// Álbum 12: Todo Tiene Su Hora (2014)
+const JLG_ALBUM_12 = ['Todo Tiene Su Hora','Lere Lere','El Capotillo','Canto a la Vida','Para Qué Sufrir','Los Dos Amores','La Paz de Dios','Yo Bailo Con Ella','Tus Ojos','Amor de Todos','Ven a Mi'];
+// Álbum 13: Radio Güira (2023)
+const JLG_ALBUM_13 = ['Radio Güira','Mambo 23','La Gracia de Dios','El Farolito (Remix)','Bachata Rosa 2023','Los Libros de la Buena Memoria','Algodón de Azúcar','Burbujas de Amor (Acústico)','La Bilirrubina (Sinfónico)','Dulce Veneno','Mil Preguntas'];
+
+/* ══════════════════════════════════════════════
+   MILLY QUEZADA — Canciones por Álbum
+   ══════════════════════════════════════════════ */
+
+const MQ_ALBUM_1 = ['La Reina del Merengue','Eras','Lo Que Más Me Gusta de Ti','Quiero Amanecer','El Hombre de Tu Vida','Sé Que No','Aprenderé','No Hace Falta Nada','Al Final','Vete y Pregona','Luz de Mi Vida','Hoy Te Confieso','Lluvia de Amor'];
+const MQ_ALBUM_2 = ['Volvió Juanita','Una Vez Más','Me Muero','De Mí','Cómo Será','Déjame','Si No Te Tengo','La Mujer Que Habla','Bendito Amor','Pa' Qué Me Sirve','Te Necesito','Amor Secreto'];
+
+/* ══════════════════════════════════════════════
+   FERNANDO VILLALONA — Canciones por Álbum
+   ══════════════════════════════════════════════ */
+
+const FV_ALBUM_1 = ['El Mayimbe','La Quiero a Ella','Celos','Dime','Amor de Cristal','El Pequeño Músico','Quisiera Ser','Ay Doctor','No Me Extraña Nada','Te Amo','Corazón de Madera'];
+const FV_ALBUM_2 = ['Mi Mujer','Copas de Licor','Vete','Yo Soy el Hombre','Por Cobardía','Te Extraño','La Última Noche','Ritmo de Mi Pueblo','Dime Que Sí','Agua de Amor','Canto a Mi Patria'];
+
+/* ══════════════════════════════════════════════
+   WILFRIDO VARGAS — Canciones por Álbum
+   ══════════════════════════════════════════════ */
+
+const WV_ALBUM_1 = ['El Jardinero','Amanecer','Abusadora','El Loco','La Medicina','Barbarazo','El Papelito Blanco','Baile del Suá Suá','El Año Viejo','El Músico','Playas de Mi Tierra','Los Cangrejos'];
+const WV_ALBUM_2 = ['Cobarde','El Comején','El Motor','La Chacabana','Las Mujeres','Mambo','Merengue Internacional','Más Que un Hombre','No Te Quiero','Pechito de Hierro','María','El Merengón'];
+
 /* ── Helper: asigna yield según popularidad ── */
 function getYieldByPopularity(views) {
   return Math.round(views * CATALOG_REVENUE_PER_VIEW);
@@ -803,10 +857,39 @@ const AUDITED_SONGS = [
   { name: 'Esa Muchacha',            nodes: 720,  views: 39000000,  yield: 1560, cat: 'RO-02' },
   { name: 'El Tiki Tiki del Amor',   nodes: 680,  views: 36000000,  yield: 1440, cat: 'RO-06' },
   { name: 'El Baile del Suá Suá',    nodes: 640,  views: 34000000,  yield: 1360, cat: 'RO-01' },
-  { name: 'América Sin Queja',       nodes: 600,  views: 32000000,  yield: 1280, cat: 'RO-02' }
+  { name: 'América Sin Queja',       nodes: 600,  views: 32000000,  yield: 1280, cat: 'RO-02' },
+  // ── Juan Luis Guerra ──
+  { name: 'Bachata Rosa',               nodes: 2800, views: 180000000, yield: 7200, cat: 'JLG-01' },
+  { name: 'Burbujas de Amor',           nodes: 3200, views: 250000000, yield: 10000, cat: 'JLG-01' },
+  { name: 'Ojalá Que Llueva Café',      nodes: 1800, views: 120000000, yield: 4800, cat: 'JLG-01' },
+  { name: 'La Bilirrubina',             nodes: 2000, views: 140000000, yield: 5600, cat: 'JLG-01' },
+  { name: 'A Pedir Su Mano',            nodes: 1200, views: 85000000,  yield: 3400, cat: 'JLG-01' },
+  { name: 'El Farolito',                nodes: 900,  views: 65000000,  yield: 2600, cat: 'JLG-01' },
+  { name: 'Fogaraté',                   nodes: 800,  views: 55000000,  yield: 2200, cat: 'JLG-02' },
+  { name: 'Ni Es Lo Mismo Ni Es Igual', nodes: 750,  views: 50000000,  yield: 2000, cat: 'JLG-02' },
+  { name: 'Visa Para un Sueño',         nodes: 700,  views: 48000000,  yield: 1920, cat: 'JLG-01' },
+  { name: 'La Llave de Mi Corazón',     nodes: 650,  views: 42000000,  yield: 1680, cat: 'JLG-03' },
+  { name: 'Todo Tiene Su Hora',         nodes: 600,  views: 38000000,  yield: 1520, cat: 'JLG-03' },
+  { name: 'Las Avispas',                nodes: 550,  views: 35000000,  yield: 1400, cat: 'JLG-02' },
+  { name: 'El Costo de la Vida',        nodes: 500,  views: 32000000,  yield: 1280, cat: 'JLG-02' },
+  { name: 'Para Ti',                    nodes: 480,  views: 30000000,  yield: 1200, cat: 'JLG-03' },
+  { name: 'Estrellitas y Duendes',      nodes: 450,  views: 28000000,  yield: 1120, cat: 'JLG-01' },
+  { name: 'Radio Güira',                nodes: 600,  views: 40000000,  yield: 1600, cat: 'JLG-04' },
+  // ── Milly Quezada ──
+  { name: 'Eras',                       nodes: 600,  views: 40000000,  yield: 1600, cat: 'MQ-01' },
+  { name: 'Volvió Juanita',             nodes: 450,  views: 32000000,  yield: 1280, cat: 'MQ-01' },
+  { name: 'Lo Que Más Me Gusta de Ti',  nodes: 400,  views: 28000000,  yield: 1120, cat: 'MQ-01' },
+  // ── Fernando Villalona ──
+  { name: 'El Mayimbe',                 nodes: 500,  views: 35000000,  yield: 1400, cat: 'FV-01' },
+  { name: 'La Quiero a Ella',           nodes: 380,  views: 25000000,  yield: 1000, cat: 'FV-01' },
+  { name: 'Celos',                      nodes: 350,  views: 22000000,  yield: 880,  cat: 'FV-01' },
+  // ── Wilfrido Vargas ──
+  { name: 'El Jardinero',               nodes: 700,  views: 48000000,  yield: 1920, cat: 'WV-01' },
+  { name: 'Abusadora',                  nodes: 550,  views: 38000000,  yield: 1520, cat: 'WV-01' },
+  { name: 'Amanecer',                   nodes: 500,  views: 35000000,  yield: 1400, cat: 'WV-01' }
 ];
 
-/* ── FULL_CATALOG — 6 catálogos con canciones reales ── */
+/* ── FULL_CATALOG — 6+ catálogos con canciones reales ── */
 const FULL_CATALOG = [
   {
     id: 'RO-01',
@@ -897,6 +980,126 @@ const FULL_CATALOG = [
     estimatedSongs: [
       ...makeSongBatch(ALBUM_16, 3500000, 50, 'RO-06'),
       ...makeSongBatch(ALBUM_17, 5000000, 75, 'RO-06')
+    ]
+  },
+  // ══════════════════════════════════════════════
+  //  JUAN LUIS GUERRA 440
+  // ══════════════════════════════════════════════
+  {
+    id: 'JLG-01',
+    name: 'Juan Luis Guerra · Bachata Rosa Época',
+    period: '1984-1992',
+    description: 'Álbumes 1-6 · Soplando a Areíto · La era dorada',
+    color: '#f0c040',
+    bgColor: '#1a2a0a',
+    icon: '🎸',
+    songCount: 65,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-01'),
+    estimatedSongs: [
+      ...makeSongBatch(JLG_ALBUM_1, 8000000, 100, 'JLG-01'),
+      ...makeSongBatch(JLG_ALBUM_2, 10000000, 120, 'JLG-01'),
+      ...makeSongBatch(JLG_ALBUM_3, 12000000, 140, 'JLG-01'),
+      ...makeSongBatch(JLG_ALBUM_4, 15000000, 180, 'JLG-01'),
+      ...makeSongBatch(JLG_ALBUM_5, 25000000, 300, 'JLG-01'),
+      ...makeSongBatch(JLG_ALBUM_6, 18000000, 200, 'JLG-01')
+    ]
+  },
+  {
+    id: 'JLG-02',
+    name: 'Juan Luis Guerra · Merengue Moderno',
+    period: '1994-2004',
+    description: 'Álbumes 7-9 · Fogaraté · Ni Es Lo Mismo · Para Ti',
+    color: '#2ecc71',
+    bgColor: '#0a2a1a',
+    icon: '🎺',
+    songCount: 32,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-02'),
+    estimatedSongs: [
+      ...makeSongBatch(JLG_ALBUM_7, 14000000, 160, 'JLG-02'),
+      ...makeSongBatch(JLG_ALBUM_8, 12000000, 140, 'JLG-02'),
+      ...makeSongBatch(JLG_ALBUM_9, 10000000, 120, 'JLG-02')
+    ]
+  },
+  {
+    id: 'JLG-03',
+    name: 'Juan Luis Guerra · Baladas y Cristiano',
+    period: '2007-2014',
+    description: 'Álbumes 10-12 · La Llave · Colección Cristiana · Todo Tiene Su Hora',
+    color: '#7db8e8',
+    bgColor: '#0a1a2a',
+    icon: '🙏',
+    songCount: 33,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-03'),
+    estimatedSongs: [
+      ...makeSongBatch(JLG_ALBUM_10, 9000000, 100, 'JLG-03'),
+      ...makeSongBatch(JLG_ALBUM_11, 5000000, 60, 'JLG-03'),
+      ...makeSongBatch(JLG_ALBUM_12, 8000000, 90, 'JLG-03')
+    ]
+  },
+  {
+    id: 'JLG-04',
+    name: 'Juan Luis Guerra · 440 Contemporáneo',
+    period: '2023',
+    description: 'Álbum 13: Radio Güira · La nueva era 440',
+    color: '#ff6b4a',
+    bgColor: '#2a1a0a',
+    icon: '📻',
+    songCount: 11,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'JLG-04'),
+    estimatedSongs: makeSongBatch(JLG_ALBUM_13, 12000000, 150, 'JLG-04')
+  },
+  // ══════════════════════════════════════════════
+  //  MILLY QUEZADA
+  // ══════════════════════════════════════════════
+  {
+    id: 'MQ-01',
+    name: 'Milly Quezada · Reina del Merengue',
+    period: '1985-2005',
+    description: 'Los grandes éxitos de la Reina del Merengue',
+    color: '#e87d9e',
+    bgColor: '#2a0a1a',
+    icon: '👑',
+    songCount: 25,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'MQ-01'),
+    estimatedSongs: [
+      ...makeSongBatch(MQ_ALBUM_1, 6000000, 80, 'MQ-01'),
+      ...makeSongBatch(MQ_ALBUM_2, 4500000, 60, 'MQ-01')
+    ]
+  },
+  // ══════════════════════════════════════════════
+  //  FERNANDO VILLALONA
+  // ══════════════════════════════════════════════
+  {
+    id: 'FV-01',
+    name: 'Fernando Villalona · El Mayimbe',
+    period: '1980-2000',
+    description: 'Grandes éxitos del Mayimbe dominicano',
+    color: '#b87de8',
+    bgColor: '#1a0a2a',
+    icon: '🎤',
+    songCount: 22,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'FV-01'),
+    estimatedSongs: [
+      ...makeSongBatch(FV_ALBUM_1, 5000000, 70, 'FV-01'),
+      ...makeSongBatch(FV_ALBUM_2, 4000000, 55, 'FV-01')
+    ]
+  },
+  // ══════════════════════════════════════════════
+  //  WILFRIDO VARGAS
+  // ══════════════════════════════════════════════
+  {
+    id: 'WV-01',
+    name: 'Wilfrido Vargas · Merengue Internacional',
+    period: '1980-2000',
+    description: 'El rey del merengue internacional · +12 éxitos',
+    color: '#5c8ce0',
+    bgColor: '#0a1a2a',
+    icon: '🌍',
+    songCount: 24,
+    auditedSongs: AUDITED_SONGS.filter(s => s.cat === 'WV-01'),
+    estimatedSongs: [
+      ...makeSongBatch(WV_ALBUM_1, 7000000, 90, 'WV-01'),
+      ...makeSongBatch(WV_ALBUM_2, 5500000, 75, 'WV-01')
     ]
   }
 ];
