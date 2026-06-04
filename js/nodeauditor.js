@@ -21,11 +21,16 @@ let naState = {
   filteredNodes: [],
   searchQuery: '',
   targetSong: null,
+  targetArtist: null,
+  artistSongs: [],
   maxNodes: 100,
   cpm: 1.50,
   isLoading: false,
   selectedIds: new Set(),
-  naView: 'nodes' // 'nodes' | 'pirates'
+  naView: 'nodes', // 'nodes' | 'pirates'
+  naSearchMode: 'song', // 'song' | 'artist'
+  useRealData: false,
+  apiBaseUrl: 'http://localhost:5000'
 };
 
 /* ── Referencias globales (se resuelven al usar) ── */
@@ -182,7 +187,141 @@ function getPirateTotals(nodes) {
 }
 
 /* ══════════════════════════════════════════════
-   BÚSQUEDA
+   BÚSQUEDA POR ARTISTA
+   ══════════════════════════════════════════════ */
+
+function searchArtistCatalog(artistName, maxNodes, cpm) {
+  naState.searchQuery = artistName.trim().toLowerCase();
+  naState.maxNodes = parseInt(maxNodes) || 100;
+  naState.cpm = parseFloat(cpm) || 1.50;
+  naState.naSearchMode = 'artist';
+  naState.selectedIds = new Set();
+  naState.naView = 'nodes';
+
+  const fullCatalog = getFullCatalog();
+  const allSongs = getCatalogSongs();
+
+  // Buscar por nombre de catálogo o artista
+  const matchedCatalogs = fullCatalog.filter(c =>
+    c.name.toLowerCase().includes(naState.searchQuery) ||
+    c.id.toLowerCase().includes(naState.searchQuery)
+  );
+
+  if (matchedCatalogs.length > 0) {
+    naState.targetArtist = {
+      name: matchedCatalogs.map(c => c.id + ' · ' + c.name).join(', '),
+      songCount: allSongs.filter(s => matchedCatalogs.some(c => c.id === s.catalogId)).length
+    };
+    naState.artistSongs = allSongs.filter(s => matchedCatalogs.some(c => c.id === s.catalogId));
+    showArtistResults(naState.artistSongs);
+    return;
+  }
+
+  // Si no encuentra en la base, tratar como artista externo
+  naState.targetArtist = { name: artistName.trim(), songCount: 0 };
+  naState.artistSongs = [];
+  // Generar una canción estimada genérica
+  const estimatedSong = {
+    name: artistName.trim() + ' - Canción Representativa',
+    views: Math.round(5000000 + Math.random() * 20000000),
+    nodes: Math.round(50 + Math.random() * 300),
+    yield: 0, audited: false, catalogId: 'EXT', catalogName: 'Catálogo Externo'
+  };
+  naState.nodes = generateNodesForSong(estimatedSong, naState.maxNodes);
+  naState.filteredNodes = [...naState.nodes];
+  naState.targetSong = estimatedSong;
+  renderResults();
+  showNodesReady(estimatedSong, true);
+}
+
+function showArtistResults(songs) {
+  const container = document.getElementById('nodeauditor-container');
+  const metrics = document.getElementById('na-metrics');
+  const wrapper = document.querySelector('.na-table-wrapper');
+  const info = document.getElementById('na-catalog-info');
+
+  // Esconder tabla, mostrar grid de canciones
+  if (wrapper) wrapper.innerHTML = `
+    <div style="padding:16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div>
+          <span style="font-size:16px;font-weight:600;">🎵 ${songs.length} canciones encontradas</span>
+          <span style="font-size:11px;color:var(--muted);margin-left:8px;">en el catálogo</span>
+        </div>
+        <button class="btn btn-sm" onclick="auditAllArtistSongs()" style="background:var(--accent);color:#0d0d0f;font-size:11px;">📊 Auditar Todas</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px;">
+        ${songs.map(s => `
+          <div style="background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 14px;cursor:pointer;transition:all 0.12s;"
+               onmouseover="this.style.borderColor='var(--accent)'"
+               onmouseout="this.style.borderColor=''"
+               onclick="auditSingleSong('${s.name.replace(/'/g, "\\'")}', ${s.nodes || 50}, ${s.views || 1000000}, '${s.catalogId || 'EXT'}')">
+            <div style="font-size:13px;font-weight:500;color:var(--text2);">${s.name}</div>
+            <div style="font-size:10px;color:var(--muted2);margin-top:4px;display:flex;gap:12px;">
+              <span>📂 ${s.catalogName || s.catalogId}</span>
+              <span>👁️ ${(s.views || 0).toLocaleString('en-US')} vistas</span>
+              <span>🔗 ${(s.nodes || 0).toLocaleString('en-US')} nodos</span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  // Actualizar métricas
+  const totalViews = songs.reduce((a, s) => a + (s.views || 0), 0);
+  const totalNodes = songs.reduce((a, s) => a + (s.nodes || 0), 0);
+  metrics.innerHTML = `
+    <div class="na-metric-card"><div class="na-metric-label">Canciones</div><div class="na-metric-value" style="font-size:22px;">${songs.length}</div></div>
+    <div class="na-metric-card"><div class="na-metric-label">Vistas Totales</div><div class="na-metric-value" style="color:var(--emerald);font-size:20px;">${(totalViews / 1000000).toFixed(1)}M</div></div>
+    <div class="na-metric-card"><div class="na-metric-label">Nodos Totales</div><div class="na-metric-value" style="color:var(--info-bright);font-size:20px;">${totalNodes.toLocaleString('en-US')}</div></div>
+    <div class="na-metric-card"><div class="na-metric-label">Acción</div><div style="font-size:11px;color:var(--muted);margin-top:6px;">Haz clic en una canción para auditar sus nodos</div></div>
+  `;
+
+  if (info) info.style.display = 'none';
+  document.getElementById('na-export-btn').disabled = true;
+}
+
+function auditSingleSong(name, nodes, views, catId) {
+  const song = { name, nodes: nodes || 50, views: views || 1000000, yield: 0, audited: false, catalogId: catId || 'EXT', catalogName: 'Catálogo' };
+  naState.targetSong = song;
+  naState.nodes = generateNodesForSong(song, naState.maxNodes);
+  naState.filteredNodes = [...naState.nodes];
+  naState.naSearchMode = 'song';
+  renderResults();
+  showNodesReady(song);
+}
+
+function auditAllArtistSongs() {
+  const songs = naState.artistSongs;
+  if (!songs || songs.length === 0) return;
+
+  // Tomar las primeras N canciones para auditar (limitado a 20 para no saturar)
+  const toAudit = songs.slice(0, Math.min(20, songs.length));
+  let allNodes = [];
+  let nodeId = 1;
+
+  toAudit.forEach(s => {
+    const songNodes = generateNodesForSong(
+      { name: s.name, nodes: s.nodes || 50, views: s.views || 1000000, yield: 0, audited: false, catalogId: s.catalogId, catalogName: s.catalogName },
+      Math.min(30, naState.maxNodes)
+    );
+    songNodes.forEach(n => {
+      n.id = nodeId++;
+      n.songName = s.name;
+      allNodes.push(n);
+    });
+  });
+
+  naState.nodes = allNodes;
+  naState.filteredNodes = [...allNodes];
+  naState.targetSong = { name: toAudit.length + ' canciones de ' + (naState.targetArtist?.name || 'artista') };
+  renderResults();
+  showNodesReady(naState.targetSong);
+}
+
+/* ══════════════════════════════════════════════
+   BÚSQUEDA POR CANCIÓN
    ══════════════════════════════════════════════ */
 
 function searchNodes(query, maxNodes, cpm) {
@@ -316,27 +455,38 @@ function renderNodeAuditor() {
         <span class="na-control-title">🔍 Parámetros de Auditoría de Nodos</span>
       </div>
       <div class="na-control-body">
+        <!-- Modo de búsqueda -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="na-search-mode-btn active" data-mode="song" onclick="setSearchMode('song')" id="na-mode-song">🎵 Buscar Canción</button>
+          <button class="na-search-mode-btn" data-mode="artist" onclick="setSearchMode('artist')" id="na-mode-artist">🎤 Buscar Artista / Catálogo</button>
+        </div>
         <div class="na-control-grid">
           <div class="na-field">
-            <label>Canción / Artista</label>
+            <label id="na-search-label">Nombre de la Canción</label>
             <input type="text" id="na-search-input" value="${defaultQuery}"
-              placeholder="Ej: Ramón Orlando - Te Compro Tu Novia"
+              placeholder="Ej: Te Compro Tu Novia"
               onkeydown="if(event.key==='Enter')executeNodeSearch()" />
           </div>
           <div class="na-field">
-            <label>Máx. Nodos a Extraer</label>
+            <label>Máx. Nodos</label>
             <input type="number" id="na-max-nodes" value="100" min="10" max="500" />
           </div>
           <div class="na-field">
-            <label>CPM Estimado (USD)</label>
+            <label>CPM (USD)</label>
             <input type="number" id="na-cpm" value="1.50" min="0.10" step="0.10" />
           </div>
           <div class="na-field na-field-btn">
             <label>&nbsp;</label>
-            <button class="btn btn-primary" onclick="executeNodeSearch()" id="na-search-btn">
-              🔍 Iniciar Extracción de Nodos
+            <button class="btn btn-primary" onclick="executeNodeSearch()" id="na-search-btn" style="font-size:12px;">
+              🔍 Iniciar Extracción
             </button>
           </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:8px 12px;background:var(--bg3);border-radius:var(--radius);">
+          <span style="font-size:10px;color:var(--muted);">Fuente de datos:</span>
+          <button class="na-source-btn active" data-source="mock" onclick="setDataSource('mock')" id="na-source-mock" style="font-size:10px;">📊 Datos del Catálogo</button>
+          <button class="na-source-btn" data-source="api" onclick="setDataSource('api')" id="na-source-api" style="font-size:10px;">🌐 YouTube Real (API)</button>
+          <span id="na-api-status" style="font-size:9px;color:var(--muted2);margin-left:auto;"></span>
         </div>
       </div>
     </div>
@@ -381,7 +531,8 @@ function renderNodeAuditor() {
           <button class="btn btn-xs btn-ghost" onclick="selectAllNodes()" style="font-size:10px;display:none;" id="na-select-all-btn">✅ Todos</button>
           <button class="btn btn-xs btn-ghost" onclick="deselectAllNodes()" style="font-size:10px;display:none;" id="na-deselect-btn">❌ Ninguno</button>
           <button class="btn btn-xs btn-ghost" onclick="removeSelectedNodes()" id="na-remove-btn" style="font-size:10px;color:var(--danger);display:none;">🗑️ Eliminar</button>
-          <button class="btn btn-xs" onclick="exportNodeReport()" id="na-export-btn" disabled style="font-size:10px;background:var(--accent);color:#0d0d0f;">📥 Exportar Auditoría</button>
+          <button class="btn btn-xs" onclick="exportNodeReport()" id="na-export-btn" disabled style="font-size:10px;background:var(--accent);color:#0d0d0f;">📥 HTML</button>
+          <button class="btn btn-xs btn-ghost" onclick="exportNodePDF()" id="na-export-pdf-btn" disabled style="font-size:10px;">📄 PDF</button>
         </div>
       </div>
       <div class="na-table-scroll">
@@ -399,6 +550,49 @@ function renderNodeAuditor() {
 }
 
 /* ── Ejecutar búsqueda ── */
+function setSearchMode(mode) {
+  naState.naSearchMode = mode;
+  document.querySelectorAll('.na-search-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.mode === mode);
+  });
+  const label = document.getElementById('na-search-label');
+  const input = document.getElementById('na-search-input');
+  if (mode === 'artist') {
+    if (label) label.textContent = 'Nombre del Artista / Catálogo';
+    if (input) input.placeholder = 'Ej: Ramón Orlando, Juan Luis Guerra...';
+  } else {
+    if (label) label.textContent = 'Nombre de la Canción';
+    if (input) input.placeholder = 'Ej: Te Compro Tu Novia';
+  }
+}
+
+function setDataSource(source) {
+  naState.useRealData = (source === 'api');
+  document.querySelectorAll('.na-source-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.source === source);
+  });
+  const status = document.getElementById('na-api-status');
+  if (source === 'api') {
+    status.textContent = '🔌 Conectando al backend local...';
+    // Verificar si la API está disponible
+    fetch(naState.apiBaseUrl + '/api/health', { signal: AbortSignal.timeout(3000) })
+      .then(r => r.json())
+      .then(d => {
+        if (d.status === 'ok') {
+          status.textContent = '✅ API conectada en ' + naState.apiBaseUrl;
+          status.style.color = 'var(--success-bright)';
+        }
+      })
+      .catch(() => {
+        status.textContent = '⚠️ API no disponible en ' + naState.apiBaseUrl + ' (inicia el backend)';
+        status.style.color = 'var(--warning)';
+      });
+  } else {
+    status.textContent = '📊 Usando datos del catálogo local';
+    status.style.color = 'var(--muted2)';
+  }
+}
+
 function executeNodeSearch() {
   const query = document.getElementById('na-search-input')?.value || '';
   const maxNodes = document.getElementById('na-max-nodes')?.value || 100;
@@ -407,10 +601,54 @@ function executeNodeSearch() {
   const btn = document.getElementById('na-search-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Extrayendo...'; }
 
-  setTimeout(() => {
-    searchNodes(query, maxNodes, cpm);
-    if (btn) { btn.disabled = false; btn.textContent = '🔍 Iniciar Extracción de Nodos'; }
-  }, 300);
+  if (naState.useRealData) {
+    // Llamar a la API real de Flask
+    fetch(naState.apiBaseUrl + '/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, max_nodes: parseInt(maxNodes), cpm: parseFloat(cpm) }),
+      signal: AbortSignal.timeout(30000)
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'success') {
+          naState.nodes = data.nodes.map(n => ({
+            ...n,
+            isPirate: n.isPirate,
+            isOfficial: n.isOfficial,
+            selected: true
+          }));
+          naState.filteredNodes = [...naState.nodes];
+          naState.targetSong = { name: query, nodes: data.song_info?.totalNodes || data.total };
+          renderResults();
+          showNodesReady(naState.targetSong, false);
+        } else {
+          alert('Error de API: ' + (data.message || 'Error desconocido'));
+        }
+      })
+      .catch(err => {
+        console.error('API error:', err);
+        alert('No se pudo conectar al backend. Asegúrate de que Flask esté corriendo en ' + naState.apiBaseUrl + '\n\nUsando datos simulados como respaldo...');
+        // Fallback a datos simulados
+        if (naState.naSearchMode === 'artist') {
+          searchArtistCatalog(query, maxNodes, cpm);
+        } else {
+          searchNodes(query, maxNodes, cpm);
+        }
+      })
+      .finally(() => {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Iniciar Extracción'; }
+      });
+  } else {
+    setTimeout(() => {
+      if (naState.naSearchMode === 'artist') {
+        searchArtistCatalog(query, maxNodes, cpm);
+      } else {
+        searchNodes(query, maxNodes, cpm);
+      }
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Iniciar Extracción'; }
+    }, 300);
+  }
 }
 
 /* ── Renderizar vista actual ── */
@@ -891,12 +1129,121 @@ function exportNodeReport() {
    INIT
    ══════════════════════════════════════════════ */
 
+/* ══════════════════════════════════════════════
+   EXPORTAR A PDF
+   ══════════════════════════════════════════════ */
+
+function exportNodePDF() {
+  const nodes = naState.filteredNodes;
+  const query = naState.searchQuery;
+  if (!nodes || nodes.length === 0) return;
+
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) {
+    alert('La librería PDF aún no ha cargado. Intenta de nuevo.');
+    return;
+  }
+
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'letter' });
+  const pageW = 270;
+
+  let totalViews = 0, totalVPH = 0, totalUSD = 0;
+  const pirates = nodes.filter(n => n.isPirate);
+  const pirateTotals = getPirateTotals(nodes);
+
+  nodes.forEach(n => {
+    totalViews += n.views; totalVPH += n.vph; totalUSD += n.est_usd_per_hour;
+  });
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('es-DO');
+
+  // ── Header ──
+  doc.setFontSize(16);
+  doc.setTextColor(201, 169, 110);
+  doc.text('Nuclear AIMA · Node Auditor', 14, 15);
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(dateStr, pageW - 14, 15, { align: 'right' });
+
+  // ── Línea ──
+  doc.setDrawColor(201, 169, 110);
+  doc.line(14, 19, pageW - 14, 19);
+
+  // ── Info de búsqueda ──
+  doc.setFontSize(11);
+  doc.setTextColor(220, 220, 220);
+  doc.text('Obra: ' + query, 14, 26);
+  doc.setFontSize(9);
+  doc.setTextColor(150, 150, 150);
+  doc.text('Nodos: ' + nodes.length + ' | Vistas: ' + totalViews.toLocaleString('en-US') + ' | VPH: ' + totalVPH.toFixed(2) + ' | USD/h: ' + totalUSD.toFixed(4), 14, 31);
+  doc.text('Piratas: ' + pirateTotals.totalPirates + ' nodos en ' + pirateTotals.uniqueChannels + ' canales', 14, 36);
+
+  // ── Tabla ──
+  const colX = [14, 110, 145, 175, 200, 225, 250];
+  const headers = ['Canal', 'Título', 'Vistas', 'VPH', 'USD/h', 'Tipo'];
+  let y = 42;
+
+  doc.setFontSize(7);
+  doc.setTextColor(201, 169, 110);
+  doc.setFillColor(22, 22, 26);
+  doc.rect(14, y - 3, pageW - 28, 5, 'F');
+  headers.forEach((h, i) => doc.text(h, colX[i], y));
+  y += 5;
+
+  doc.setFontSize(6.5);
+  nodes.slice(0, 80).forEach((n, i) => {
+    if (y > 185) {
+      doc.addPage();
+      y = 15;
+      doc.setFontSize(7);
+      doc.setTextColor(201, 169, 110);
+      doc.setFillColor(22, 22, 26);
+      doc.rect(14, y - 3, pageW - 28, 5, 'F');
+      headers.forEach((h, i) => doc.text(h, colX[i], y));
+      y += 5;
+      doc.setFontSize(6.5);
+    }
+    doc.setTextColor(n.isPirate ? 220 : 180, n.isPirate ? 80 : 180, n.isPirate ? 80 : 180);
+    doc.text(n.channel.substring(0, 22), colX[0], y);
+    doc.setTextColor(200, 200, 200);
+    doc.text(n.title.substring(0, 20), colX[1], y);
+    doc.text(n.views.toLocaleString('en-US'), colX[2], y, { align: 'right' });
+    doc.setTextColor(100, 180, 230);
+    doc.text(n.vph.toFixed(2), colX[3], y, { align: 'right' });
+    doc.setTextColor(220, 160, 80);
+    doc.text('$' + n.est_usd_per_hour.toFixed(4), colX[4], y, { align: 'right' });
+    doc.setTextColor(150, 150, 150);
+    doc.text(n.isPirate ? 'PIRATA' : n.isOfficial ? 'OFICIAL' : 'COVER', colX[5], y);
+    y += 4;
+  });
+
+  // ── Footer ──
+  doc.setDrawColor(201, 169, 110);
+  doc.line(14, y + 4, pageW - 14, y + 4);
+  doc.setFontSize(6);
+  doc.setTextColor(100, 100, 100);
+  doc.text('Nuclear AIMA · Sistema de Auditoría Forense de Activos Digitales · Generado: ' + dateStr, pageW / 2, y + 10, { align: 'center' });
+
+  const filename = `Auditoria_${query.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 30)}.pdf`;
+  doc.save(filename);
+}
+
+/* ══════════════════════════════════════════════
+   INIT
+   ══════════════════════════════════════════════ */
+
 window.renderNodeAuditor = renderNodeAuditor;
 window.executeNodeSearch = executeNodeSearch;
+window.setSearchMode = setSearchMode;
+window.setDataSource = setDataSource;
 window.toggleNodeSelection = toggleNodeSelection;
 window.selectAllNodes = selectAllNodes;
 window.deselectAllNodes = deselectAllNodes;
 window.removeSelectedNodes = removeSelectedNodes;
 window.removeNode = removeNode;
 window.exportNodeReport = exportNodeReport;
+window.exportNodePDF = exportNodePDF;
 window.switchNAView = switchNAView;
+window.auditSingleSong = auditSingleSong;
+window.auditAllArtistSongs = auditAllArtistSongs;

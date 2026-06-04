@@ -1,0 +1,11 @@
+# Nuclear AIMA - Backend Node Auditor
+# Motor de raspado de YouTube con Selenium
+
+flask==3.1.0
+flask-cors==5.0.1
+selenium==4.30.0
+webdriver-manager==4.0.2
+beautifulsoup4==4.13.3
+requests==2.32.3
+python-dateutil==2.9.0
+gunicorn==23.0.0
