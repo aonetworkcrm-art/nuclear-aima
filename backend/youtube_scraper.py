@@ -165,8 +165,7 @@ class YouTubeScraper:
             except Exception as e2:
                 # Último intento: buscar chromedriver en PATH
                 try:
-                    from selenium.webdriver.chrome.service import Service as BaseService
-                    self.driver = webdriver.Chrome(service=BaseService(), options=options)
+                    self.driver = webdriver.Chrome(service=Service(), options=options)
                 except Exception as e3:
                     raise RuntimeError(f"No se pudo iniciar ChromeDriver: {e2}\n{e3}")
 
