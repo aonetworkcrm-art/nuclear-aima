@@ -683,6 +683,152 @@ class YouTubeScraper:
             return None
 
     # ─────────────────────────────────────────────
+    #  SHORTS TENDENCIA / TRENDING (sin query)
+    # ─────────────────────────────────────────────
+
+    def search_trending_shorts(self, max_results=30, country='US', language='en'):
+        """
+        Busca los Shorts más virales del momento en YouTube.
+        No requiere query de búsqueda — navega directamente a
+        la página de tendencias y extrae Shorts del shelf.
+        
+        Estrategias:
+        1. YouTube Trending page → reel shelves (ytInitialData)
+        2. YouTube Shorts página principal → DOM
+        3. Búsqueda genérica 'viral shorts music' → fallback
+        
+        Args:
+            max_results: Máximo de Shorts a extraer
+            country: Código de país (default: 'US')
+            language: Código de idioma (default: 'en')
+            
+        Returns:
+            Lista de diccionarios con datos de cada Short
+        """
+        if not self.driver:
+            self._init_driver()
+
+        all_shorts = []
+        seen_ids = set()
+
+        # ── ESTRATEGIA 1: Trending page → reel shelves ──
+        try:
+            print('[YouTubeScraper] Estrategia 1: Trending page')
+            trending_url = f'https://www.youtube.com/feed/trending?hl={language}&gl={country}'
+            self.driver.get(trending_url)
+
+            WebDriverWait(self.driver, self.timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'ytd-video-renderer, ytd-section-list-renderer, #contents'))
+            )
+            time.sleep(2)
+
+            # Intentar con ytInitialData
+            initial_data = self._extract_yt_initial_data()
+            if initial_data:
+                try:
+                    # Navegar por la estructura del trending
+                    contents = (initial_data.get('contents', {})
+                                .get('twoColumnBrowseResultsRenderer', {})
+                                .get('tabs', [{}])[0]
+                                .get('tabRenderer', {})
+                                .get('content', {})
+                                .get('sectionListRenderer', {})
+                                .get('contents', []))
+
+                    for section in contents:
+                        if len(all_shorts) >= max_results:
+                            break
+
+                        # Buscar reelShelfRenderer (el shelf de Shorts en trending)
+                        try:
+                            # Puede estar en itemSection o directo
+                            item_section = section.get('itemSectionRenderer', {}) or {}
+                            sub_contents = item_section.get('contents', [])
+
+                            # También buscar shelfRenderer con etiqueta "Shorts" o "Trending Shorts"
+                            shelf = section.get('shelfRenderer', {}) or {}
+                            if shelf:
+                                title_runs = shelf.get('title', {}).get('runs', [])
+                                shelf_title = ' '.join(r.get('text', '') for r in title_runs).lower()
+                                if 'short' in shelf_title:
+                                    shelf_contents = (shelf.get('content', {})
+                                                      .get('horizontalListRenderer', {})
+                                                      .get('items', []))
+                                    for item in shelf_contents:
+                                        if len(all_shorts) >= max_results:
+                                            break
+                                        short = self._parse_reel_item(item, 'Trending')
+                                        if short and short['video_id'] not in seen_ids:
+                                            seen_ids.add(short['video_id'])
+                                            short['id'] = len(all_shorts) + 1
+                                            short['isTrending'] = True
+                                            short['trendingSource'] = 'trending-shelf'
+                                            all_shorts.append(short)
+
+                            # También buscar reelShelfRenderer en sub_contents
+                            for sub in sub_contents:
+                                if len(all_shorts) >= max_results:
+                                    break
+                                reel_shelf = sub.get('reelShelfRenderer', {}) or \
+                                             sub.get('richShelfRenderer', {}) or \
+                                             sub.get('shelfRenderer', {}).get('content', {}).get('horizontalListRenderer', {})
+                                if reel_shelf:
+                                    items = reel_shelf.get('items', [])
+                                    for item in items:
+                                        if len(all_shorts) >= max_results:
+                                            break
+                                        short = self._parse_reel_item(item, 'Trending')
+                                        if short and short['video_id'] not in seen_ids:
+                                            seen_ids.add(short['video_id'])
+                                            short['id'] = len(all_shorts) + 1
+                                            short['isTrending'] = True
+                                            short['trendingSource'] = 'trending-reel'
+                                            all_shorts.append(short)
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+            print(f'[YouTubeScraper] Estrategia 1: {len(all_shorts)} Shorts de trending')
+        except Exception as e:
+            print(f'[YouTubeScraper] Error trending page: {e}')
+
+        # ── ESTRATEGIA 2: Shorts trending via búsqueda genérica ──
+        if len(all_shorts) < max_results:
+            try:
+                print('[YouTubeScraper] Estrategia 2: Búsqueda genérica trending shorts')
+                # Buscar términos virales genéricos
+                trending_queries = [
+                    '#shorts viral',
+                    'trending shorts music',
+                    'viral shorts',
+                ]
+                for query in trending_queries:
+                    if len(all_shorts) >= max_results:
+                        break
+                    remaining = max_results - len(all_shorts)
+                    shorts = self.search_shorts(query, max_results=min(remaining, 15))
+                    for s in shorts:
+                        if s.get('video_id') and s['video_id'] not in seen_ids:
+                            seen_ids.add(s['video_id'])
+                            s['isTrending'] = True
+                            s['trendingSource'] = 'generic-search'
+                            if s['id'] == 0:
+                                s['id'] = len(all_shorts) + 1
+                            all_shorts.append(s)
+            except Exception as e:
+                print(f'[YouTubeScraper] Error generic search: {e}')
+
+        print(f'[YouTubeScraper] Total trending Shorts: {len(all_shorts)}')
+
+        # Reasignar IDs y ordenar por vistas
+        for i, s in enumerate(all_shorts):
+            s['id'] = i + 1
+        all_shorts.sort(key=lambda x: x.get('views', 0), reverse=True)
+
+        return all_shorts[:max_results]
+
+    # ─────────────────────────────────────────────
     #  BÚSQUEDA DE NODOS REGULARES
     # ─────────────────────────────────────────────
 

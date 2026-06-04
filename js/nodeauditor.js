@@ -1234,17 +1234,26 @@ function renderShortsView() {
       <span style="font-size:11px;color:var(--muted);">📈 <strong style="color:var(--info-bright);">${totals.totalVPD.toLocaleString('en-US')}</strong> vistas/día</span>
       <span style="font-size:11px;color:var(--muted);">💎 Viral Score: <strong style="color:${totals.avgViralScore > 70 ? 'var(--success)' : 'var(--warning)'};">${totals.avgViralScore}/100</strong></span>
     </div>
-    <div style="display:flex;gap:4px;height:32px;align-items:flex-end;">
-      ${consolidated.slice(0, 10).map(ch => {
-        const h = Math.max(4, (ch.totalViews / maxViews) * 100);
-        const color = ch.totalViews > maxViews * 0.5 ? 'var(--info-bright)' : ch.totalViews > maxViews * 0.2 ? 'var(--info)' : 'var(--muted2)';
-        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;">
-          <div style="font-size:7px;color:var(--muted2);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${ch.channel.substring(0, 8)}</div>
-          <div style="width:100%;height:${Math.round(h)}%;background:${color};border-radius:2px 2px 0 0;min-height:3px;" title="${ch.channel}: ${ch.totalViews.toLocaleString()} vistas"></div>
-        </div>`;
-      }).join('')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px;">
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:10px;">
+        <div style="font-size:9px;font-weight:600;color:var(--info-bright);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:8px;text-align:center;">📊 Distribución por Canal</div>
+        ${renderDonutChart(consolidated.slice(0, 12), 'totalViews', 'channel', 160, 28)}
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:600;color:var(--info-bright);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:8px;text-align:center;">📈 Top Canales (barras)</div>
+        <div style="display:flex;gap:3px;height:120px;align-items:flex-end;padding:0 4px;">
+          ${consolidated.slice(0, 8).map(ch => {
+            const h = Math.max(4, (ch.totalViews / (consolidated[0]?.totalViews || 1)) * 100);
+            const color = ch.totalViews > (consolidated[0]?.totalViews || 1) * 0.5 ? 'var(--info-bright)' : ch.totalViews > (consolidated[0]?.totalViews || 1) * 0.2 ? 'var(--info)' : 'var(--muted2)';
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+              <div style="font-size:7px;color:var(--muted2);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50px;text-align:center;line-height:1.2;">${ch.channel.substring(0, 6)}</div>
+              <div style="width:100%;height:${Math.round(h)}%;background:${color};border-radius:3px 3px 0 0;min-height:3px;transition:height 0.4s ease-out;" title="${ch.channel}: ${ch.totalViews.toLocaleString()} vistas"></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="font-size:8px;color:var(--muted2);margin-top:4px;text-align:center;">Top canales por vistas totales</div>
+      </div>
     </div>
-    <div style="font-size:9px;color:var(--muted2);margin-top:4px;">Top canales por vistas de Shorts</div>
   </div></td></tr>`;
 
   // Tabla de Shorts individuales (paginada)
@@ -1261,7 +1270,10 @@ function renderShortsView() {
     const viewsColor = s.views > 5000000 ? 'var(--danger)' : s.views > 1000000 ? 'var(--warning)' : 'var(--text)';
 
     html += `
-      <tr class="na-node-row" style="background:rgba(92,140,224,0.02);">
+      <tr class="na-node-row" style="background:rgba(92,140,224,0.02);cursor:pointer;" 
+          onclick="showShortDetail(naState.shortsFiltered[${startIdx + i}])"
+          onmouseover="this.style.background='rgba(92,140,224,0.08)'"
+          onmouseout="this.style.background='rgba(92,140,224,0.02)'">
         <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">${startIdx + i + 1}</td>
         <td>
           <div style="font-size:12px;font-weight:500;color:var(--info-bright);">📱 ${s.channel}</div>
@@ -1277,7 +1289,7 @@ function renderShortsView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);">${(s.estViewsPerDay || 0).toLocaleString()}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${s.est_usd_per_hour.toFixed(6)}</td>
         <td style="text-align:center;">
-          <a href="${s.url}" target="_blank" class="na-node-link" title="Ver Short en YouTube">📱</a>
+          <a href="${s.url}" target="_blank" class="na-node-link" title="Ver Short en YouTube" onclick="event.stopPropagation()">📱</a>
         </td>
       </tr>
     `;
@@ -1315,6 +1327,221 @@ function renderShortsView() {
   document.getElementById('na-deselect-btn').style.display = 'none';
   document.getElementById('na-remove-btn').style.display = 'none';
 }
+
+/* ══════════════════════════════════════════════
+   MODAL DE DETALLE DE SHORT
+   ══════════════════════════════════════════════ */
+
+function showShortDetail(short) {
+  if (!short) return;
+  
+  const ageStr = short.age_days < 30 ? Math.round(short.age_days) + ' días'
+    : short.age_days < 365 ? Math.round(short.age_days / 30) + ' meses'
+    : (short.age_days / 365).toFixed(1) + ' años';
+  
+  const viralLevel = short.viralScore > 80 ? '🔥 Viral' 
+    : short.viralScore > 60 ? '⚡ Trending' 
+    : '📈 Activo';
+  
+  const viralColor = short.viralScore > 80 ? 'var(--danger)' 
+    : short.viralScore > 60 ? 'var(--warning)' 
+    : 'var(--info)';
+  
+  const monthlyLoss = (short.est_usd_per_hour || 0) * 730;
+  const monthlyStr = monthlyLoss >= 1000 
+    ? '$' + (monthlyLoss / 1000).toFixed(1) + 'K' 
+    : '$' + monthlyLoss.toFixed(2);
+  
+  const bodyHTML = `
+    <div style="font-size:13px;line-height:1.7;">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:14px;border-bottom:0.5px solid var(--border);">
+        <div style="width:48px;height:48px;border-radius:12px;background:rgba(92,140,224,0.15);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">📱</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:600;color:var(--text);">${short.title}</div>
+          <div style="font-size:11px;color:var(--info-bright);margin-top:2px;">📱 ${short.channel}</div>
+        </div>
+        <div style="text-align:right;">
+          <span style="font-size:10px;padding:2px 10px;border-radius:4px;background:rgba(92,140,224,0.12);color:var(--info-bright);font-weight:600;">${viralLevel}</span>
+          <div style="font-size:9px;color:var(--muted2);margin-top:4px;">Score: ${short.viralScore}/100</div>
+        </div>
+      </div>
+      
+      <!-- Métricas en grid -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;">Vistas</div>
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--text);">${short.views.toLocaleString('en-US')}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;">VPH</div>
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--info-bright);">${short.vph.toFixed(2)}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;">Vistas/día</div>
+          <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--accent);">${(short.estViewsPerDay || 0).toLocaleString('en-US')}</div>
+        </div>
+        <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:4px;">Antigüedad</div>
+          <div style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--muted);">${ageStr}</div>
+        </div>
+      </div>
+      
+      <!-- Detalles adicionales -->
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:8px;">📊 Rendimiento Estimado</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;">
+          <div style="color:var(--muted);">USD/hora:</div>
+          <div style="font-family:var(--mono);color:var(--orange-bright);font-weight:600;text-align:right;">$${short.est_usd_per_hour.toFixed(6)}</div>
+          <div style="color:var(--muted);">USD/mes:</div>
+          <div style="font-family:var(--mono);color:var(--orange-bright);font-weight:600;text-align:right;">${monthlyStr}</div>
+          <div style="color:var(--muted);">Fuente:</div>
+          <div style="font-family:var(--mono);color:var(--muted2);text-align:right;">${short.source || 'Simulado'}</div>
+          <div style="color:var(--muted);">Duración:</div>
+          <div style="font-family:var(--mono);color:var(--muted2);text-align:right;">${short.duration || '0:00-1:00'}</div>
+        </div>
+      </div>
+      
+      <!-- Viral Score Bar -->
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;margin-bottom:12px;">
+        <div style="font-size:10px;font-weight:600;color:var(--muted2);text-transform:uppercase;letter-spacing:0.03em;margin-bottom:6px;">🔥 Viral Score</div>
+        <div style="height:20px;background:var(--bg4);border-radius:10px;overflow:hidden;border:0.5px solid var(--border);">
+          <div style="height:100%;width:${short.viralScore}%;background:linear-gradient(90deg,var(--info),${viralColor});border-radius:10px;transition:width 0.6s ease-out;"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted2);margin-top:3px;">
+          <span>0</span>
+          <span style="font-weight:600;color:${viralColor};">${short.viralScore}/100 — ${viralLevel}</span>
+          <span>100</span>
+        </div>
+      </div>
+      
+      ${short.songName ? `
+      <div style="font-size:10px;color:var(--muted2);padding:6px 0;">
+        🎵 Short asociado a: <strong style="color:var(--text2);">${short.songName}</strong>
+      </div>` : ''}
+    </div>
+  `;
+  
+  const footerHTML = `
+    <button class="btn btn-sm btn-ghost" onclick="closeModal()">Cerrar</button>
+    <a href="${short.url}" target="_blank" class="btn btn-sm" style="background:var(--info-bright);color:#0d0d0f;border:none;text-decoration:none;">📱 Ver en YouTube</a>
+    <button class="btn btn-sm btn-ghost" onclick="closeModal();showShortsBreakdown()" style="display:${naState.naView === 'shorts' ? 'none' : 'inline-flex'};">📊 Ver todos los Shorts</button>
+  `;
+  
+  openModal('📱 Detalle del Short', bodyHTML, footerHTML);
+}
+
+
+/* ══════════════════════════════════════════════
+   GRÁFICO DE DONA (DONUT CHART) — SVG puro
+   ══════════════════════════════════════════════ */
+
+const DONUT_COLORS = [
+  '#4dabf7', '#6ecfa5', '#ff922b', '#e05c5c', '#b87de8',
+  '#f0c040', '#5c8ce0', '#e87d9e', '#2ecc71', '#ff6b8a',
+  '#7db8e8', '#e8c96e', '#5ce0dc', '#e8a06e', '#9e7de8',
+  '#4cad7c', '#e05c8c', '#c9a96e', '#5c8ce0', '#ff4444'
+];
+
+function renderDonutChart(data, valueKey, labelKey, size = 180, donutWidth = 32) {
+  /**
+   * Genera HTML de un gráfico de dona SVG.
+   * 
+   * @param {Array} data - Array de objetos con datos
+   * @param {string} valueKey - Key numérico (e.g. 'totalViews')
+   * @param {string} labelKey - Key del label (e.g. 'channel')
+   * @param {number} size - Diámetro del SVG
+   * @param {number} donutWidth - Grosor del anillo
+   * @returns {string} HTML string con SVG + leyenda
+   */
+  if (!data || data.length === 0) return '<div style="font-size:11px;color:var(--muted2);text-align:center;padding:20px;">Sin datos</div>';
+  
+  const total = data.reduce((sum, d) => sum + (d[valueKey] || 0), 0);
+  if (total === 0) return '<div style="font-size:11px;color:var(--muted2);text-align:center;padding:20px;">Sin datos</div>';
+  
+  const cx = size / 2;
+  const cy = size / 2;
+  const radius = (size - donutWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  
+  // Top N + "Otros"
+  const maxSlices = 8;
+  let slices;
+  if (data.length <= maxSlices) {
+    slices = data.map(d => ({ ...d }));
+  } else {
+    const top = data.slice(0, maxSlices - 1);
+    const others = data.slice(maxSlices - 1);
+    const othersAggregated = {
+      [labelKey]: 'Otros canales',
+      [valueKey]: others.reduce((sum, d) => sum + (d[valueKey] || 0), 0)
+    };
+    slices = [...top, othersAggregated];
+  }
+  
+  // Calcular segmentos
+  let currentOffset = 0;
+  const segments = slices.map((d, i) => {
+    const val = d[valueKey] || 0;
+    const pct = val / total;
+    const length = pct * circumference;
+    const offset = currentOffset;
+    currentOffset += length;
+    return {
+      ...d,
+      pct,
+      length,
+      offset,
+      color: DONUT_COLORS[i % DONUT_COLORS.length],
+      index: i
+    };
+  });
+  
+  // SVG
+  const rotation = -90; // empezar desde arriba
+  let svgArcs = segments.map((seg, i) => {
+    const dashArray = `${seg.length} ${circumference - seg.length}`;
+    const dashOffset = -seg.offset;
+    return `<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none"
+      stroke="${seg.color}" stroke-width="${donutWidth}"
+      stroke-dasharray="${dashArray}"
+      stroke-dashoffset="${dashOffset}"
+      transform="rotate(${rotation} ${cx} ${cy})"
+      style="transition: stroke-dashoffset 0.6s ease-out;"
+      opacity="0.92" />`;
+  }).join('\n');
+  
+  // Centro del donut: total
+  const totalShort = formatViewsShort(total);
+  
+  const svg = `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    ${svgArcs}
+    <text x="${cx}" y="${cy - 6}" text-anchor="middle" fill="var(--text)"
+      font-size="${size * 0.13}" font-weight="700" font-family="var(--mono)">${totalShort}</text>
+    <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--muted2)"
+      font-size="${size * 0.055}" font-family="var(--font)">vistas</text>
+  </svg>`;
+  
+  // Leyenda
+  const legend = segments.map(seg => {
+    const pctStr = (seg.pct * 100).toFixed(1) + '%';
+    const label = seg[labelKey] || '';
+    const shortLabel = label.length > 18 ? label.substring(0, 16) + '…' : label;
+    const valStr = formatViewsShort(seg[valueKey] || 0);
+    return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:10px;color:var(--text2);">
+      <span style="width:10px;height:10px;border-radius:3px;background:${seg.color};flex-shrink:0;"></span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${shortLabel}</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--muted);">${valStr}</span>
+      <span style="font-family:var(--mono);font-size:9px;color:${seg.pct > 0.15 ? 'var(--success)' : 'var(--muted2)'};font-weight:600;">${pctStr}</span>
+    </div>`;
+  }).join('');
+  
+  return `<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+    <div style="flex-shrink:0;">${svg}</div>
+    <div style="flex:1;min-width:140px;">${legend}</div>
+  </div>`;
+}
+
 
 /* ══════════════════════════════════════════════
    MÉTRICAS
@@ -1796,3 +2023,4 @@ window.applyShortsChannelFilter = applyShortsChannelFilter;
 window.shortsPrevPage = shortsPrevPage;
 window.shortsNextPage = shortsNextPage;
 window.generateShortsForSong = generateShortsForSong;
+window.showShortDetail = showShortDetail;

@@ -336,8 +336,7 @@ def shorts_batch():
         'totalUSD': round(sum(s.get('est_usd_per_hour', 0) for s in all_shorts), 6),
         'uniqueChannels': len(by_channel),
         'topChannels': channels_sorted[:10],
-        'uniqueSongs': len(set(s.get('songName', '') for s in all_shorts if s.get('songName'))),
-        'avgViewsPerShort': sum(s.get('views', 0) for s in all_shorts) // len(all_shorts) if all_shorts else 0
+        'uniqueSongs': len(set(s.get('songName', '') for s in all_shorts if s.get('songName'))),            'avgViewsPerShort': sum(s.get('views', 0) for s in all_shorts) // len(all_shorts) if all_shorts else 0
     }
 
     return jsonify({
@@ -349,6 +348,150 @@ def shorts_batch():
         'errors': errors,
         'message': f'Extraídos {len(all_shorts)} Shorts de {len(songs)} canciones'
     })
+
+
+@app.route('/api/shorts/trending', methods=['GET'])
+def shorts_trending():
+    """
+    Shorts más virales del momento en YouTube (sin query).
+    Extrae Shorts de la página de tendencias + búsquedas genéricas.
+    
+    Query params:
+        max_results (int, opcional): Máximo de Shorts (default: 30, max: 60)
+        country (str, opcional): Código de país (default: 'US')
+        cpm (float, opcional): CPM estimado (default: 1.50)
+        min_views (int, opcional): Filtro mínimo de vistas (default: 0)
+    
+    Response:
+        status: 'success' | 'error'
+        shorts: Lista de Shorts trending
+        shorts_info: Métricas consolidadas
+        trending_source: Origen de los datos ('trending-shelf' | 'generic-search')
+        total: Número de Shorts
+        message: Mensaje informativo
+    """
+    max_results = min(int(request.args.get('max_results', 30)), 60)
+    country = request.args.get('country', 'US')
+    cpm = float(request.args.get('cpm', 1.50))
+    min_views = int(request.args.get('min_views', 0))
+
+    logger.info(f"Fetching trending Shorts: max={max_results} | country={country} | min_views={min_views}")
+
+    scraper = YouTubeScraper(headless=True, timeout=25)
+    try:
+        shorts = scraper.search_trending_shorts(max_results=max_results, country=country)
+
+        # Filtrar por vistas mínimas
+        if min_views > 0:
+            shorts = [s for s in shorts if s.get('views', 0) >= min_views]
+
+        # Reasignar IDs
+        for i, s in enumerate(shorts):
+            s['id'] = i + 1
+
+        # Enriquecer con estimaciones USD
+        for s in shorts:
+            s['est_usd_per_hour'] = round((s.get('vph', 0) * cpm * 0.5) / 1000, 6)
+            s['type'] = 'short'
+            s['typeLabel'] = '📱 Short'
+
+        # Métricas consolidadas
+        info = scraper.get_shorts_info(shorts)
+
+        # Origen predominante
+        sources = set(s.get('trendingSource', 'unknown') for s in shorts)
+        primary_source = 'trending-shelf' if 'trending-shelf' in sources else 'generic-search'
+
+        return jsonify({
+            'status': 'success',
+            'shorts': shorts,
+            'shorts_info': info,
+            'trending_source': primary_source,
+            'country': country,
+            'total': len(shorts),
+            'message': f'Extraídos {len(shorts)} Shorts virales del momento'
+        })
+    except Exception as e:
+        logger.error(f"Error fetching trending Shorts: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        scraper.close()
+
+
+@app.route('/api/shorts/trending/music', methods=['GET'])
+def shorts_trending_music():
+    """
+    Shorts musicales virales del momento (con filtro de música).
+    Versión especializada que busca trending shorts con contenido musical.
+    
+    Query params:
+        max_results (int, opcional): Máximo de Shorts (default: 30, max: 60)
+        genre (str, opcional): Género musical (default: 'latin', ej: 'pop', 'reggaeton', 'salsa')
+        cpm (float, opcional): CPM estimado (default: 1.50)
+    """
+    max_results = min(int(request.args.get('max_results', 30)), 60)
+    genre = request.args.get('genre', 'latin')
+    cpm = float(request.args.get('cpm', 1.50))
+
+    logger.info(f"Fetching trending music Shorts: max={max_results} | genre={genre}")
+
+    scraper = YouTubeScraper(headless=True, timeout=25)
+    try:
+        # Buscar trending shorts con término musical
+        trending_queries = [
+            f'{genre} music #shorts',
+            f'#shorts trending {genre}',
+            f'viral {genre} shorts',
+        ]
+
+        all_shorts = []
+        seen_ids = set()
+
+        for query in trending_queries:
+            if len(all_shorts) >= max_results:
+                break
+            remaining = max_results - len(all_shorts)
+            try:
+                shorts = scraper.search_shorts(query, max_results=min(remaining, 15))
+                for s in shorts:
+                    vid = s.get('video_id', '')
+                    if vid and vid not in seen_ids:
+                        seen_ids.add(vid)
+                        s['genre'] = genre
+                        s['trendingSource'] = 'music-search'
+                        all_shorts.append(s)
+            except Exception:
+                continue
+
+        # Ordenar por vistas
+        all_shorts.sort(key=lambda s: s.get('views', 0), reverse=True)
+        all_shorts = all_shorts[:max_results]
+
+        # Enriquecer
+        for i, s in enumerate(all_shorts):
+            s['id'] = i + 1
+            s['est_usd_per_hour'] = round((s.get('vph', 0) * cpm * 0.5) / 1000, 6)
+            s['type'] = 'short'
+            s['typeLabel'] = '📱 Short'
+
+        info = scraper.get_shorts_info(all_shorts)
+
+        return jsonify({
+            'status': 'success',
+            'shorts': all_shorts,
+            'shorts_info': info,
+            'genre': genre,
+            'queries_used': len(trending_queries),
+            'total': len(all_shorts),
+            'message': f'Extraídos {len(all_shorts)} Shorts musicales ({genre}) del momento'
+        })
+    except Exception as e:
+        logger.error(f"Error fetching trending music Shorts: {e}")
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+    finally:
+        scraper.close()
 
 
 # ── Main ──

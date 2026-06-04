@@ -1874,6 +1874,20 @@ function showShortsBreakdown() {
   // Top Shorts por vistas
   const topShorts = data.allShorts.sort((a, b) => b.views - a.views).slice(0, 30);
 
+  // ── Agrupar por canal para el donut chart ──
+  const byChannel = {};
+  data.allShorts.forEach(s => {
+    if (!byChannel[s.channel]) {
+      byChannel[s.channel] = { channel: s.channel, totalViews: 0, count: 0 };
+    }
+    byChannel[s.channel].totalViews += s.views;
+    byChannel[s.channel].count++;
+  });
+  const channelData = Object.values(byChannel).sort((a, b) => b.totalViews - a.totalViews);
+  const donutHtml = typeof renderDonutChart === 'function'
+    ? renderDonutChart(channelData, 'totalViews', 'channel', 200, 36)
+    : '';
+
   // Tabla de Shorts
   const shortsRows = topShorts.map((s, i) => `
     <tr>
@@ -1915,6 +1929,13 @@ function showShortsBreakdown() {
         <div style="font-size:10px;color:var(--muted);">${formatMoneyCompact(data.totalUSD)}/h</div>
       </div>
     </div>
+
+    ${donutHtml ? `
+    <div style="margin-bottom:16px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:500;">🎯 Distribución de Shorts por canal</div>
+      ${donutHtml}
+    </div>
+    ` : ''}
 
     <h4 style="font-size:12px;color:var(--accent);margin-bottom:8px;">📱 Top Shorts Virales (${topShorts.length})</h4>
     <div style="overflow-x:auto;">
