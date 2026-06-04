@@ -11,54 +11,41 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 # ── Instala dependencias del sistema necesarias para Chrome ──
-# python:3.12-slim = Debian Bookworm (nombres t64 para algunas libs)
+# Nota: python:3.12-slim usa Debian Trixie (testing) actualmente.
+# NO incluimos libgdk-pixbuf2.0-0 (no existe en Trixie, no necesario para headless).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
-    gnupg \
-    unzip \
     curl \
+    gnupg \
     ca-certificates \
     fonts-liberation \
-    libasound2t64 \
+    libasound2 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
-    libc6 \
-    libcairo2 \
-    libcups2t64 \
-    libdbus-1-3 \
+    libcups2 \
     libdrm2 \
-    libexpat1 \
-    libfontconfig1 \
     libgbm1 \
-    libgcc-s1 \
-    libgdk-pixbuf2.0-0 \
-    libglib2.0-0 \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libstdc++6 \
-    libx11-6 \
-    libx11-xcb1 \
-    libxcb1 \
+    libu2f-udev \
+    libvulkan1 \
     libxcomposite1 \
-    libxcursor1 \
     libxdamage1 \
-    libxext6 \
     libxfixes3 \
-    libxi6 \
     libxkbcommon0 \
     libxrandr2 \
-    libxrender1 \
-    libxss1 \
-    libxtst6 \
+    xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# ── Instala Google Chrome (stable) ──
-RUN wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
-    && apt-get install -y /tmp/chrome.deb \
-    && rm /tmp/chrome.deb \
+# ── Instala Google Chrome (stable) usando el repo oficial ──
+# El repo resuelve dependencias automaticamente, mucho mas confiable
+# que descargar el .deb manualmente.
+RUN curl -fsSL https://dl-ssl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends google-chrome-stable \
+    && rm -rf /var/lib/apt/lists/* \
     && google-chrome --version
 
 # ── Variables de entorno para Chrome ──
