@@ -1,12 +1,13 @@
 """
 Nuclear AIMA — YouTube Scraper
 Motor de raspado de YouTube con Selenium + BeautifulSoup
-Extrae nodos (videos) de una canción/artista con métricas reales
+Extrae nodos (videos) y Shorts de una canción/artista con métricas reales
 """
 
 import re
 import time
 import math
+import json
 from datetime import datetime, timezone
 from dateutil import parser as dateparser
 from selenium import webdriver
@@ -18,6 +19,7 @@ from selenium.common.exceptions import TimeoutException, WebDriverException
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
+
 
 # ── Canales Piratas Conocidos ──
 PIRATE_KEYWORDS = [
@@ -274,6 +276,242 @@ class YouTubeScraper:
             'officialNodes': len(official),
         }
 
+    def search_shorts(self, query, max_results=30):
+        """
+        Busca YouTube Shorts relacionados con una canción.
+        
+        Los Shorts aparecen en un shelf especial en los resultados de búsqueda
+        o se pueden buscar directamente con '#shorts' + query.
+        
+        Args:
+            query: Término de búsqueda (ej. "Te Compro Tu Novia")
+            max_results: Máximo de Shorts a extraer
+            
+        Returns:
+            Lista de diccionarios con datos de cada Short
+        """
+        if not self.driver:
+            self._init_driver()
+
+        # Estrategia 1: buscar con #shorts para obtener Shorts específicos
+        search_query = f"{query} #shorts"
+        search_url = f"https://www.youtube.com/results?search_query={search_query.replace(' ', '+')}"
+        shorts = []
+        seen_urls = set()
+
+        try:
+            print(f"[YouTubeScraper] Buscando Shorts: {search_query}")
+            self.driver.get(search_url)
+
+            # Esperar a que cargue la página
+            WebDriverWait(self.driver, self.timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'ytd-item-section-renderer, ytd-video-renderer, ytd-reel-item-renderer'))
+            )
+
+            # Scroll para cargar más
+            last_height = self.driver.execute_script("return document.documentElement.scrollHeight")
+            scroll_attempts = 0
+            while len(shorts) < max_results and scroll_attempts < 5:
+                self.driver.execute_script("window.scrollTo(0, document.documentElement.scrollHeight);")
+                time.sleep(1.5)
+                new_height = self.driver.execute_script("return document.documentElement.scrollHeight")
+                if new_height == last_height:
+                    break
+                last_height = new_height
+                scroll_attempts += 1
+
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+
+            # ── Estrategia A: Extraer Shorts del shelf de Shorts ──
+            # Buscar el contenedor de reel (Short) items
+            reel_items = soup.select('ytd-reel-item-renderer, ytd-video-renderer[is-shorts], [is-shorts]')
+            
+            for el in reel_items:
+                if len(shorts) >= max_results:
+                    break
+                try:
+                    short = self._extract_short_from_element(el, query)
+                    if short and short['url'] not in seen_urls:
+                        seen_urls.add(short['url'])
+                        shorts.append(short)
+                except Exception:
+                    continue
+
+            # ── Estrategia B: Buscar enlaces /shorts/ en toda la página ──
+            if len(shorts) < max_results:
+                short_links = soup.select('a[href*="/shorts/"]')
+                for link in short_links:
+                    if len(shorts) >= max_results:
+                        break
+                    try:
+                        href = link.get('href', '')
+                        full_url = f"https://www.youtube.com{href}" if href.startswith('/') else href
+                        if full_url in seen_urls:
+                            continue
+                        
+                        # Intentar extraer datos del contenedor padre
+                        parent = link.parent
+                        title = link.get('title') or link.text.strip() or query
+                        
+                        # Buscar vistas en elementos cercanos
+                        views_text = ''
+                        for candidate in parent.find_all(['span', 'div']):
+                            txt = candidate.text.strip().lower()
+                            if ('view' in txt or 'reprodu' in txt) and re.search(r'\d', txt):
+                                views_text = candidate.text.strip()
+                                break
+                        
+                        views = parse_views(views_text) if views_text else 0
+                        
+                        # Buscar canal
+                        channel_el = parent.select_one('a[href*="/@"], yt-formatted-string.ytd-channel-name')
+                        channel = channel_el.text.strip() if channel_el else 'Desconocido'
+                        
+                        # Buscar antigüedad
+                        age_text = ''
+                        for candidate in parent.find_all(['span']):
+                            txt = candidate.text.strip().lower()
+                            if 'ago' in txt:
+                                age_text = candidate.text.strip()
+                                break
+                        age_days = parse_relative_time(age_text) if age_text else 0
+                        vph = calculate_vph(views, age_days) if age_days > 0 else 0
+                        
+                        if views > 0 or title:
+                            seen_urls.add(full_url)
+                            shorts.append({
+                                'id': len(shorts) + 1,
+                                'title': title or query,
+                                'channel': channel,
+                                'url': full_url,
+                                'views': views,
+                                'age_days': age_days or 30,
+                                'vph': vph,
+                                'duration': '0:00-1:00',
+                                'isPirate': is_pirate_channel(channel),
+                                'isOfficial': False
+                            })
+                    except Exception:
+                        continue
+
+            print(f"[YouTubeScraper] Extraídos {len(shorts)} Shorts para '{query}'")
+
+        except TimeoutException:
+            print("[YouTubeScraper] Timeout buscando Shorts")
+        except Exception as e:
+            print(f"[YouTubeScraper] Error buscando Shorts: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return shorts
+
+    def _extract_short_from_element(self, el, query):
+        """Extrae datos de un elemento Short de YouTube."""
+        # Título
+        title_el = el.select_one('#video-title, a#video-title, yt-formatted-string[title]')
+        title = title_el.get('title') or title_el.text.strip() if title_el else ''
+        
+        # URL
+        link = el.select_one('a[href*="/shorts/"], a#video-title')
+        if not link:
+            link = el.select_one('a[href]')
+        href = link.get('href', '') if link else ''
+        if '/shorts/' not in href:
+            return None
+        full_url = f"https://www.youtube.com{href}" if href.startswith('/') else href
+        
+        # Canal
+        channel_el = el.select_one('ytd-channel-name a, a[href*="/@"], yt-formatted-string.ytd-channel-name')
+        channel = channel_el.text.strip() if channel_el else 'Desconocido'
+        
+        # Vistas
+        views_text = ''
+        metadata = el.select_one('#metadata-line, .metadata-snippet')
+        if metadata:
+            spans = metadata.select('span')
+            for span in spans:
+                txt = span.text.strip().lower()
+                if 'view' in txt:
+                    views_text = span.text.strip()
+                    break
+        views = parse_views(views_text) if views_text else 0
+        
+        # Antigüedad
+        age_text = ''
+        if metadata:
+            spans = metadata.select('span')
+            for span in spans:
+                txt = span.text.strip().lower()
+                if 'ago' in txt:
+                    age_text = span.text.strip()
+                    break
+        age_days = parse_relative_time(age_text) if age_text else 0
+        vph = calculate_vph(views, age_days) if age_days > 0 else 0
+        
+        return {
+            'id': 0,
+            'title': title or query,
+            'channel': channel,
+            'url': full_url,
+            'views': views,
+            'age_days': age_days or 30,
+            'vph': vph,
+            'duration': '0:00-1:00',  # Shorts < 60s
+            'isPirate': is_pirate_channel(channel),
+            'isOfficial': False
+        }
+
+    def get_shorts_info(self, shorts):
+        """Calcula información consolidada de Shorts."""
+        total_views = sum(s['views'] for s in shorts)
+        total_vph = sum(s['vph'] for s in shorts)
+        
+        # Agrupar por canal
+        by_channel = {}
+        for s in shorts:
+            ch = s['channel']
+            if ch not in by_channel:
+                by_channel[ch] = {
+                    'channel': ch,
+                    'count': 0,
+                    'totalViews': 0,
+                    'totalVPH': 0
+                }
+            by_channel[ch]['count'] += 1
+            by_channel[ch]['totalViews'] += s['views']
+            by_channel[ch]['totalVPH'] += s['vph']
+        
+        channels_sorted = sorted(by_channel.values(), key=lambda x: x['totalViews'], reverse=True)
+        
+        return {
+            'totalShorts': len(shorts),
+            'totalViews': total_views,
+            'totalVPH': round(total_vph, 2),
+            'uniqueChannels': len(by_channel),
+            'topChannels': channels_sorted[:5],
+            'avgViewsPerShort': total_views // len(shorts) if shorts else 0
+        }
+
+    def search_song_with_shorts(self, query, max_nodes=50, max_shorts=20):
+        """
+        Búsqueda completa: nodos regulares + Shorts en una sola llamada.
+        
+        Args:
+            query: Término de búsqueda
+            max_nodes: Máximo de nodos regulares
+            max_shorts: Máximo de Shorts
+            
+        Returns:
+            Dict con 'nodes' y 'shorts'
+        """
+        nodes = self.search_song(query, max_results=max_nodes)
+        shorts = self.search_shorts(query, max_results=max_shorts)
+        
+        return {
+            'nodes': nodes,
+            'shorts': shorts
+        }
+
     def close(self):
         """Cierra el WebDriver."""
         if self.driver:
@@ -286,11 +524,18 @@ class YouTubeScraper:
 
 # ── Uso directo ──
 if __name__ == '__main__':
-    import json
     scraper = YouTubeScraper(headless=True)
     try:
-        nodes = scraper.search_song('Ramón Orlando - Te Compro Tu Novia', max_results=30)
-        info = scraper.get_song_info(nodes)
-        print(json.dumps({'nodes': nodes[:5], 'info': info}, indent=2, ensure_ascii=False))
+        import sys
+        query = sys.argv[1] if len(sys.argv) > 1 else 'Ramón Orlando - Te Compro Tu Novia'
+        
+        # Shorts test
+        shorts = scraper.search_shorts(query, max_results=15)
+        info = scraper.get_shorts_info(shorts)
+        print(json.dumps({'shorts': shorts, 'info': info}, indent=2, ensure_ascii=False))
+        
+        # Full test
+        # result = scraper.search_song_with_shorts(query, max_nodes=20, max_shorts=10)
+        # print(json.dumps(result, indent=2, ensure_ascii=False))
     finally:
         scraper.close()

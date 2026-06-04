@@ -117,6 +117,7 @@ function navigateTo(section) {
     updateChecklistProgress();
     updateRecoveryDashboard();
     updateCatalogDashboard();
+    updateShortsDashboard();
     checkChecklistReminder();
   }
 
@@ -1766,6 +1767,179 @@ function renderMultiArtist() {
       </div>
     </div>
   `;
+}
+
+/* ══════════════════════════════════════════════
+   SHORTS DASHBOARD — Métricas Agregadas de Todos los Artistas
+   ══════════════════════════════════════════════ */
+
+let _dashboardShortsCache = null;
+
+function updateShortsDashboard() {
+  generateAggregatedShortsData();
+  renderShortsCard();
+}
+
+function generateAggregatedShortsData() {
+  // Generar Shorts para TODAS las canciones auditadas de todos los artistas
+  // Usar cache para evitar regenerar en cada render
+  if (_dashboardShortsCache) return _dashboardShortsCache;
+
+  const allShorts = [];
+  AUDITED_SONGS.forEach(song => {
+    const shorts = generateShortsForSong(
+      { name: song.name, views: song.views || 1000000 },
+      10  // 10 Shorts por canción para no saturar
+    );
+    shorts.forEach(sh => {
+      sh.artistCat = song.cat;
+      sh.songName = song.name;
+      allShorts.push(sh);
+    });
+  });
+
+  // Agrupar por canal viral
+  const byChannel = {};
+  allShorts.forEach(s => {
+    if (!byChannel[s.channel]) {
+      byChannel[s.channel] = {
+        channel: s.channel,
+        count: 0,
+        totalViews: 0,
+        totalVPH: 0,
+        totalUSD: 0,
+        totalVPD: 0
+      };
+    }
+    byChannel[s.channel].count++;
+    byChannel[s.channel].totalViews += s.views;
+    byChannel[s.channel].totalVPH += s.vph;
+    byChannel[s.channel].totalUSD += s.est_usd_per_hour;
+    byChannel[s.channel].totalVPD += s.estViewsPerDay || 0;
+  });
+
+  const channels = Object.values(byChannel).sort((a, b) => b.totalViews - a.totalViews);
+
+  const totals = {
+    totalShorts: allShorts.length,
+    totalViews: allShorts.reduce((a, s) => a + s.views, 0),
+    totalVPH: allShorts.reduce((a, s) => a + s.vph, 0),
+    totalUSD: allShorts.reduce((a, s) => a + s.est_usd_per_hour, 0),
+    totalVPD: allShorts.reduce((a, s) => a + (s.estViewsPerDay || 0), 0),
+    uniqueChannels: channels.length,
+    topChannels: channels.slice(0, 8),
+    allShorts
+  };
+
+  // Compactar: solo guardar lo esencial para el card
+  _dashboardShortsCache = totals;
+  return totals;
+}
+
+function renderShortsCard() {
+  const data = generateAggregatedShortsData();
+  if (!data) return;
+
+  const viewsEl = document.getElementById('dash-shorts-views');
+  const countEl = document.getElementById('dash-shorts-count');
+  const channelsEl = document.getElementById('dash-shorts-channels');
+  const vpdEl = document.getElementById('dash-shorts-vpd');
+  const usdEl = document.getElementById('dash-shorts-usd');
+  const chartEl = document.getElementById('dash-shorts-bar-chart');
+
+  if (viewsEl) viewsEl.textContent = formatViewsShort(data.totalViews);
+  if (countEl) countEl.textContent = data.totalShorts.toLocaleString('en-US');
+  if (channelsEl) channelsEl.textContent = data.uniqueChannels.toLocaleString('en-US');
+  if (vpdEl) vpdEl.innerHTML = `📈 <strong>${Math.round(data.totalVPD).toLocaleString('en-US')}</strong> vistas/día combinadas`;
+  if (usdEl) usdEl.innerHTML = `💰 <strong>${formatMoneyCompact(data.totalUSD)}</strong>/h en Shorts · ${formatMoneyCompact(data.totalUSD * 730)}/mes perdidos`;
+
+  // Mini bar chart de top canales
+  if (chartEl && data.topChannels.length > 0) {
+    const maxViews = data.topChannels[0].totalViews;
+    chartEl.innerHTML = data.topChannels.map(ch => {
+      const h = Math.max(3, (ch.totalViews / maxViews) * 100);
+      const color = ch.totalViews > maxViews * 0.5 ? 'var(--info-bright)' :
+                    ch.totalViews > maxViews * 0.2 ? 'var(--info)' : 'var(--muted2)';
+      return `<div style="flex:1;height:${Math.round(h)}%;background:${color};border-radius:2px 2px 0 0;min-height:3px;" title="${ch.channel}: ${formatViewsShort(ch.totalViews)}"></div>`;
+    }).join('');
+  }
+}
+
+function showShortsBreakdown() {
+  const data = generateAggregatedShortsData();
+  if (!data) return;
+
+  // Top Shorts por vistas
+  const topShorts = data.allShorts.sort((a, b) => b.views - a.views).slice(0, 30);
+
+  // Tabla de Shorts
+  const shortsRows = topShorts.map((s, i) => `
+    <tr>
+      <td style="font-size:11px;color:var(--muted);text-align:center;padding:4px 6px;">${i + 1}</td>
+      <td style="padding:4px 6px;">
+        <div style="font-size:12px;font-weight:500;color:var(--info-bright);">📱 ${s.channel}</div>
+        <div style="font-size:10px;color:var(--muted2);">${s.songName}</div>
+      </td>
+      <td style="padding:4px 6px;font-size:11px;color:var(--text2);">${s.title}</td>
+      <td style="text-align:right;padding:4px 6px;font-family:var(--mono);font-size:12px;font-weight:600;color:${s.views > 5000000 ? 'var(--danger)' : 'var(--text)'};">${formatViewsShort(s.views)}</td>
+      <td style="text-align:right;padding:4px 6px;font-family:var(--mono);font-size:11px;color:var(--accent);">${(s.estViewsPerDay || 0).toLocaleString('en-US')}</td>
+      <td style="text-align:right;padding:4px 6px;font-family:var(--mono);font-size:11px;color:${s.viralScore > 70 ? 'var(--danger)' : 'var(--warning)'};">${s.viralScore}/100</td>
+    </tr>
+  `).join('');
+
+  const totalMonthlyLoss = data.totalUSD * 730;
+
+  openModal('📱 YouTube Shorts · Panorama General', `
+    <div style="margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6;">
+      Shorts virales generados por fans, cuentas de baile y canales virales que utilizan
+      las canciones del catálogo sin licencia. Datos agregados de <strong>${AUDITED_SONGS.length} canciones auditadas</strong>
+      de todos los artistas en el sistema.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Total Shorts</div>
+        <div style="font-size:24px;font-weight:700;color:var(--info-bright);">${data.totalShorts.toLocaleString('en-US')}</div>
+        <div style="font-size:10px;color:var(--muted);">en ${data.uniqueChannels} canales</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Vistas Totales</div>
+        <div style="font-size:20px;font-weight:700;color:var(--emerald);font-family:var(--mono);">${formatViewsShort(data.totalViews)}</div>
+        <div style="font-size:10px;color:var(--muted);">${Math.round(data.totalVPD).toLocaleString('en-US')} vistas/día</div>
+      </div>
+      <div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Pérdida Est.</div>
+        <div style="font-size:18px;font-weight:700;color:var(--danger);font-family:var(--mono);">${formatMoneyCompact(totalMonthlyLoss)}/mes</div>
+        <div style="font-size:10px;color:var(--muted);">${formatMoneyCompact(data.totalUSD)}/h</div>
+      </div>
+    </div>
+
+    <h4 style="font-size:12px;color:var(--accent);margin-bottom:8px;">📱 Top Shorts Virales (${topShorts.length})</h4>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr>
+            <th style="width:30px;text-align:center;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">#</th>
+            <th style="text-align:left;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">Canal / Canción</th>
+            <th style="text-align:left;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">Título</th>
+            <th style="text-align:right;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">Vistas</th>
+            <th style="text-align:right;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">Vistas/día</th>
+            <th style="text-align:right;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">🔥 Viral</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shortsRows}
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:var(--radius);font-size:11px;color:var(--muted);text-align:center;line-height:1.6;">
+      💰 <strong>Dinero perdido en Shorts:</strong> ${formatMoneyCompact(totalMonthlyLoss)}/mes
+      · 📈 <strong>VPH combinado:</strong> ${data.totalVPH.toFixed(1)} vistas/hora
+      · 🎯 <strong>Canales virales:</strong> ${data.uniqueChannels}
+      <br><span style="font-size:10px;">Los Shorts tienen CPM reducido (~50% del video regular) por el YouTube Shorts Fund</span>
+    </div>
+  `);
 }
 
 /* ── Init ── */

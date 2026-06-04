@@ -1,7 +1,7 @@
 /* ══════════════════════════════════════════════
-   NUCLEAR AIMA — NODE AUDITOR v1.1
+   NUCLEAR AIMA — NODE AUDITOR v1.2
    Auditoría Forense de Nodos Musicales
-   Detección y Consolidación de Canales Piratas
+   Detección de Canales Piratas + YouTube Shorts Virales
    ══════════════════════════════════════════════ */
 
 /* ── Canales Piratas Conocidos ── */
@@ -27,10 +27,13 @@ let naState = {
   cpm: 1.50,
   isLoading: false,
   selectedIds: new Set(),
-  naView: 'nodes', // 'nodes' | 'pirates'
+  naView: 'nodes', // 'nodes' | 'pirates' | 'shorts'
   naSearchMode: 'song', // 'song' | 'artist'
   useRealData: false,
-  apiBaseUrl: 'http://localhost:5000'
+  apiBaseUrl: 'http://localhost:5000',
+  // Shorts data
+  shorts: [],
+  shortsFiltered: []
 };
 
 /* ── Referencias globales (se resuelven al usar) ── */
@@ -147,6 +150,90 @@ function generateNodesForSong(song, count) {
 }
 
 /* ══════════════════════════════════════════════
+   GENERACIÓN DE SHORTS (simulación viral)
+   ══════════════════════════════════════════════ */
+
+function generateShortsForSong(song, count) {
+  const shorts = [];
+  const baseViews = song.views || 1000000;
+  const seedBase = song.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+
+  // Los Shorts tienen distribución ultra-concentrada:
+  // El top 1-3 son virales masivos, el resto decae rápido
+  const actualCount = Math.min(count || 25, 50);
+
+  const shortTemplates = [
+    ' #shorts #viral', ' 🕺 Bailando', ' 💃 Coreografía',
+    ' 🎵 Para ti', ' 🔥 Challenge', ' #parati',
+    ' 🏆 Viral Dance', ' 💫 Ritmo', ' ⚡ Short',
+    ' 🎶 #fyp', ' 🌟 Trend', ' 🔁 Remix Short'
+  ];
+
+  // Canales de Shorts virales (fanáticos y cuentas de baile)
+  const shortChannelGroups = [
+    ['Dance Latinos 🕺', 'Bailando en Casa', 'Ritmo Viral', 'Merengue Challenge', 'Pasito Dominicano'],
+    ['Dance Fitness RD', 'Coreografías Latinas', 'Baila Conmigo', 'Latin Vibes Shorts', 'El Baile del Momento'],
+    ['Dembow Shorts', 'Virales RD', 'TikTok Merengue', 'Dance Trends 2025', 'Ritmo Latino Shorts'],
+    ['Salsa y Merengue Shorts', 'Bailando con el Ritmo', 'Sabor Tropical Shorts', 'Bailar es Salud', 'Ritmo y Movimiento']
+  ];
+
+  for (let i = 0; i < actualCount; i++) {
+    const seed = seedBase + i * 13 + 9999;
+    const r = seededRandom(seed);
+
+    const rank = i + 1;
+    // Los Shorts virales tienen distribución aún más concentrada (exponente 1.8)
+    const viewShare = (1 / Math.pow(rank, 1.8)) /
+      Array.from({ length: actualCount }, (_, j) => 1 / Math.pow(j + 1, 1.8)).reduce((a, b) => a + b, 0);
+
+    // Los Shorts generan vistas masivas relativas al tamaño del catálogo
+    const shortViews = Math.round(baseViews * 1.5 * viewShare);
+
+    // Shorts son más recientes (días, no años)
+    const shortAgeDays = Math.round(1 + r * 120);
+    const shortAgeHours = shortAgeDays * 24;
+    const vph = shortAgeHours > 0 ? +(shortViews / shortAgeHours).toFixed(2) : 0;
+
+    // CPM de Shorts es ~50% del CPM regular (YouTube Shorts Fund)
+    const usdPerHour = +((vph * naState.cpm * 0.5) / 1000).toFixed(6);
+
+    // Asignar canal según grupo
+    const groupIdx = Math.floor(seededRandom(seed + 5555) * shortChannelGroups.length);
+    const channelGroup = shortChannelGroups[groupIdx];
+    const channelIdx = Math.floor(seededRandom(seed + 7777) * channelGroup.length);
+    const channel = channelGroup[channelIdx];
+
+    // Título del Short (más corto, más viral)
+    const template = shortTemplates[Math.floor(seededRandom(seed + 3333) * shortTemplates.length)];
+    const title = `${song.name}${template}`;
+
+    shorts.push({
+      id: i + 1,
+      title,
+      channel,
+      url: `https://www.youtube.com/shorts/?search_query=${encodeURIComponent(song.name + ' short')}`,
+      views: shortViews,
+      age_days: shortAgeDays,
+      vph,
+      est_usd_per_hour: usdPerHour,
+      type: 'short',
+      typeLabel: '📱 Short',
+      isPirate: false,
+      isOfficial: false,
+      isShort: true,
+      // Métricas específicas de Shorts
+      viralScore: Math.min(99, Math.round(seededRandom(seed + 1111) * 100)),
+      estViewsPerDay: Math.round(shortViews / Math.max(1, shortAgeDays))
+    });
+  }
+
+  shorts.sort((a, b) => b.views - a.views);
+  shorts.forEach((s, i) => { s.id = i + 1; });
+
+  return shorts;
+}
+
+/* ══════════════════════════════════════════════
    CONSOLIDACIÓN POR CANAL PIRATA
    ══════════════════════════════════════════════ */
 
@@ -183,6 +270,48 @@ function getPirateTotals(nodes) {
     totalViews: pirates.reduce((a, n) => a + n.views, 0),
     totalVPH: pirates.reduce((a, n) => a + n.vph, 0),
     totalUSD: pirates.reduce((a, n) => a + n.est_usd_per_hour, 0)
+  };
+}
+
+/* ══════════════════════════════════════════════
+   CONSOLIDACIÓN DE SHORTS POR CANAL
+   ══════════════════════════════════════════════ */
+
+function consolidateShortsByChannel(shorts) {
+  const byChannel = {};
+
+  shorts.forEach(s => {
+    if (!byChannel[s.channel]) {
+      byChannel[s.channel] = {
+        channel: s.channel,
+        shorts: [],
+        totalViews: 0,
+        totalVPH: 0,
+        totalUSD: 0,
+        totalVPD: 0,
+        shortCount: 0
+      };
+    }
+    byChannel[s.channel].shorts.push(s);
+    byChannel[s.channel].totalViews += s.views;
+    byChannel[s.channel].totalVPH += s.vph;
+    byChannel[s.channel].totalUSD += s.est_usd_per_hour;
+    byChannel[s.channel].totalVPD += s.estViewsPerDay || 0;
+    byChannel[s.channel].shortCount++;
+  });
+
+  return Object.values(byChannel).sort((a, b) => b.totalViews - a.totalViews);
+}
+
+function getShortsTotals(shorts) {
+  return {
+    totalShorts: shorts.length,
+    uniqueChannels: new Set(shorts.map(s => s.channel)).size,
+    totalViews: shorts.reduce((a, s) => a + s.views, 0),
+    totalVPH: shorts.reduce((a, s) => a + s.vph, 0),
+    totalUSD: shorts.reduce((a, s) => a + s.est_usd_per_hour, 0),
+    totalVPD: shorts.reduce((a, s) => a + (s.estViewsPerDay || 0), 0),
+    avgViralScore: Math.round(shorts.reduce((a, s) => a + (s.viralScore || 0), 0) / Math.max(1, shorts.length))
   };
 }
 
@@ -287,6 +416,8 @@ function auditSingleSong(name, nodes, views, catId) {
   naState.targetSong = song;
   naState.nodes = generateNodesForSong(song, naState.maxNodes);
   naState.filteredNodes = [...naState.nodes];
+  naState.shorts = generateShortsForSong(song, 25);
+  naState.shortsFiltered = [...naState.shorts];
   naState.naSearchMode = 'song';
   renderResults();
   showNodesReady(song);
@@ -305,20 +436,23 @@ function auditAllArtistSongs() {
     const payload = {
       songs: toAudit.map(s => ({ name: s.name })),
       max_nodes_per_song: Math.min(20, naState.maxNodes),
-      cpm: naState.cpm
+      cpm: naState.cpm,
+      include_shorts: true
     };
 
     fetch(naState.apiBaseUrl + '/api/audit/batch', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(120000) // 2 min timeout
+      signal: AbortSignal.timeout(120000)
     })
       .then(r => r.json())
       .then(data => {
         if (data.status === 'success') {
-          naState.nodes = data.nodes.map(n => ({ ...n, selected: true }));
+          naState.nodes = (data.nodes || []).map(n => ({ ...n, selected: true }));
           naState.filteredNodes = [...naState.nodes];
+          naState.shorts = (data.shorts || []).map(s => ({ ...s, isShort: true }));
+          naState.shortsFiltered = [...naState.shorts];
           naState.targetSong = { name: toAudit.length + ' canciones del catálogo' };
           renderResults();
           showNodesReady(naState.targetSong);
@@ -340,6 +474,7 @@ function auditAllArtistSongs() {
 
 function generateMockBatch(toAudit) {
   let allNodes = [];
+  let allShorts = [];
   let nodeId = 1;
   toAudit.forEach(s => {
     const songNodes = generateNodesForSong(
@@ -351,9 +486,20 @@ function generateMockBatch(toAudit) {
       n.songName = s.name;
       allNodes.push(n);
     });
+    // Generar Shorts para cada canción
+    const songShorts = generateShortsForSong(
+      { name: s.name, views: s.views || 1000000 },
+      15
+    );
+    songShorts.forEach(sh => {
+      sh.songName = s.name;
+      allShorts.push(sh);
+    });
   });
   naState.nodes = allNodes;
   naState.filteredNodes = [...allNodes];
+  naState.shorts = allShorts;
+  naState.shortsFiltered = [...allShorts];
   naState.targetSong = { name: toAudit.length + ' canciones de ' + (naState.targetArtist?.name || 'artista') };
   renderResults();
   showNodesReady(naState.targetSong);
@@ -385,6 +531,8 @@ function searchNodes(query, maxNodes, cpm) {
     naState.targetSong = match;
     naState.nodes = generateNodesForSong(match, naState.maxNodes);
     naState.filteredNodes = [...naState.nodes];
+    naState.shorts = generateShortsForSong(match, 25);
+    naState.shortsFiltered = [...naState.shorts];
     renderResults();
     showNodesReady(match);
   } else {
@@ -397,6 +545,8 @@ function searchNodes(query, maxNodes, cpm) {
       naState.targetSong = matchAudited;
       naState.nodes = generateNodesForSong(matchAudited, naState.maxNodes);
       naState.filteredNodes = [...naState.nodes];
+      naState.shorts = generateShortsForSong(matchAudited, 25);
+      naState.shortsFiltered = [...naState.shorts];
       renderResults();
       showNodesReady(matchAudited);
     } else {
@@ -412,6 +562,8 @@ function searchNodes(query, maxNodes, cpm) {
       naState.targetSong = estimatedSong;
       naState.nodes = generateNodesForSong(estimatedSong, naState.maxNodes);
       naState.filteredNodes = [...naState.nodes];
+      naState.shorts = generateShortsForSong(estimatedSong, 25);
+      naState.shortsFiltered = [...naState.shorts];
       renderResults();
       showNodesReady(estimatedSong, true);
     }
@@ -491,7 +643,7 @@ function renderNodeAuditor() {
   container.innerHTML = `
     <div class="na-control-panel">
       <div class="na-control-header">
-        <span class="na-control-title">🔍 Parámetros de Auditoría de Nodos</span>
+        <span class="na-control-title">🔍 Parámetros de Auditoría de Nodos + Shorts</span>
       </div>
       <div class="na-control-body">
         <!-- Modo de búsqueda -->
@@ -562,6 +714,9 @@ function renderNodeAuditor() {
             <button class="na-view-tab" data-view="pirates" onclick="switchNAView('pirates')">
               🏴‍☠️ Piratas <span id="na-tab-pirates-count" style="font-size:9px;opacity:0.7;"></span>
             </button>
+            <button class="na-view-tab" data-view="shorts" onclick="switchNAView('shorts')" id="na-tab-shorts">
+              📱 Shorts <span id="na-tab-shorts-count" style="font-size:9px;opacity:0.7;"></span>
+            </button>
           </div>
           <span id="na-nodes-info" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
           <span id="na-selection-bar" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
@@ -613,7 +768,6 @@ function setDataSource(source) {
   const status = document.getElementById('na-api-status');
   if (source === 'api') {
     status.textContent = '🔌 Conectando al backend local...';
-    // Verificar si la API está disponible
     fetch(naState.apiBaseUrl + '/api/health', { signal: AbortSignal.timeout(3000) })
       .then(r => r.json())
       .then(d => {
@@ -627,7 +781,7 @@ function setDataSource(source) {
         status.style.color = 'var(--warning)';
       });
   } else {
-    status.textContent = '📊 Usando datos del catálogo local';
+    status.textContent = '📊 Usando datos del catálogo local + Shorts simulados';
     status.style.color = 'var(--muted2)';
   }
 }
@@ -641,23 +795,24 @@ function executeNodeSearch() {
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Extrayendo...'; }
 
   if (naState.useRealData) {
-    // Llamar a la API real de Flask
     fetch(naState.apiBaseUrl + '/api/audit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, max_nodes: parseInt(maxNodes), cpm: parseFloat(cpm) }),
+      body: JSON.stringify({ query, max_nodes: parseInt(maxNodes), cpm: parseFloat(cpm), include_shorts: true }),
       signal: AbortSignal.timeout(30000)
     })
       .then(r => r.json())
       .then(data => {
         if (data.status === 'success') {
-          naState.nodes = data.nodes.map(n => ({
+          naState.nodes = (data.nodes || []).map(n => ({
             ...n,
             isPirate: n.isPirate,
             isOfficial: n.isOfficial,
             selected: true
           }));
           naState.filteredNodes = [...naState.nodes];
+          naState.shorts = (data.shorts || []).map(s => ({ ...s, isShort: true }));
+          naState.shortsFiltered = [...naState.shorts];
           naState.targetSong = { name: query, nodes: data.song_info?.totalNodes || data.total };
           renderResults();
           showNodesReady(naState.targetSong, false);
@@ -668,7 +823,6 @@ function executeNodeSearch() {
       .catch(err => {
         console.error('API error:', err);
         alert('No se pudo conectar al backend. Asegúrate de que Flask esté corriendo en ' + naState.apiBaseUrl + '\n\nUsando datos simulados como respaldo...');
-        // Fallback a datos simulados
         if (naState.naSearchMode === 'artist') {
           searchArtistCatalog(query, maxNodes, cpm);
         } else {
@@ -692,7 +846,9 @@ function executeNodeSearch() {
 
 /* ── Renderizar vista actual ── */
 function renderResults() {
-  if (naState.naView === 'pirates') {
+  if (naState.naView === 'shorts') {
+    renderShortsView();
+  } else if (naState.naView === 'pirates') {
     renderPirateView();
   } else {
     renderNodeView();
@@ -728,6 +884,7 @@ function renderNodeView() {
     document.getElementById('na-select-all-btn').style.display = 'none';
     document.getElementById('na-deselect-btn').style.display = 'none';
     document.getElementById('na-tab-pirates-count').textContent = '';
+    document.getElementById('na-tab-shorts-count').textContent = '';
     return;
   }
 
@@ -786,6 +943,8 @@ function renderNodeView() {
   // Update pirate tab count
   const pirateCount = nodes.filter(n => n.isPirate).length;
   document.getElementById('na-tab-pirates-count').textContent = `(${pirateCount})`;
+  // Update shorts tab count
+  document.getElementById('na-tab-shorts-count').textContent = `(${naState.shorts.length})`;
 
   document.getElementById('na-export-btn').disabled = false;
   document.getElementById('na-select-all-btn').style.display = 'inline-flex';
@@ -829,12 +988,11 @@ function renderPirateView() {
 
   let html = '';
   consolidated.forEach((ch, i) => {
-    const monthlyLoss = ch.totalUSD * 730; // ~730 horas/mes
+    const monthlyLoss = ch.totalUSD * 730;
     const monthlyStr = monthlyLoss >= 1000
       ? '$' + (monthlyLoss / 1000).toFixed(1) + 'K'
       : '$' + monthlyLoss.toFixed(0);
 
-    // Top songs from this channel
     const topSongs = ch.songs.slice(0, 3).map(s => s.title.split(' (')[0]).join(', ');
     const extra = ch.songs.length > 3 ? ` y ${ch.songs.length - 3} más` : '';
 
@@ -857,7 +1015,6 @@ function renderPirateView() {
     `;
   });
 
-  // Totales fila
   const totalMonthlyLoss = totals.totalUSD * 730;
   const totalMonthlyStr = totalMonthlyLoss >= 1000
     ? '$' + (totalMonthlyLoss / 1000).toFixed(1) + 'K'
@@ -878,7 +1035,6 @@ function renderPirateView() {
 
   tbody.innerHTML = html;
 
-  // Update metrics with pirate-specific data
   document.getElementById('na-metric-nodes').innerHTML = `${totals.uniqueChannels} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">canales</span>`;
   document.getElementById('na-metric-views').innerHTML = `${totals.totalViews.toLocaleString('en-US')} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">robadas</span>`;
   document.getElementById('na-metric-vph').innerHTML = `${totals.totalVPH.toFixed(1)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
@@ -893,10 +1049,136 @@ function renderPirateView() {
   document.getElementById('na-remove-btn').style.display = 'none';
 }
 
-/* ── Métricas ── */
+/* ══════════════════════════════════════════════
+   VISTA DE SHORTS VIRALES
+   ══════════════════════════════════════════════ */
+
+function renderShortsView() {
+  const thead = document.getElementById('na-table-head');
+  const tbody = document.getElementById('na-node-tbody');
+  const shorts = naState.shortsFiltered;
+  const consolidated = consolidateShortsByChannel(shorts);
+  const totals = getShortsTotals(shorts);
+
+  thead.innerHTML = `
+    <tr>
+      <th style="width:36px;">#</th>
+      <th style="width:170px;">Canal Viral</th>
+      <th>Título del Short</th>
+      <th style="text-align:right;width:110px;">Vistas</th>
+      <th style="text-align:right;width:70px;">Edad</th>
+      <th style="text-align:right;width:70px;">VPH</th>
+      <th style="text-align:right;width:80px;">Vistas/día</th>
+      <th style="text-align:right;width:80px;">USD/h</th>
+      <th style="text-align:center;width:54px;">🔗</th>
+    </tr>
+  `;
+
+  if (!shorts || shorts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px 16px;color:var(--muted2);font-size:12px;">
+      📱 No se detectaron Shorts virales para esta búsqueda.<br>
+      <span style="font-size:11px;color:var(--muted);">Los Shorts se generan automáticamente al auditar una canción.</span>
+    </td></tr>`;
+    updateShortsMetrics(shorts);
+    document.getElementById('na-export-btn').disabled = false;
+    document.getElementById('na-select-all-btn').style.display = 'none';
+    document.getElementById('na-deselect-btn').style.display = 'none';
+    document.getElementById('na-remove-btn').style.display = 'none';
+    return;
+  }
+
+  // ── Top Bar Chart ──
+  const maxViews = consolidated.length > 0 ? consolidated[0].totalViews : 1;
+  let html = '';
+
+  // Primero: métricas consolidadas por canal
+  html += `<tr><td colspan="9" style="padding:0;"><div style="padding:10px 14px;background:rgba(92,140,224,0.06);border-bottom:0.5px solid rgba(92,140,224,0.15);">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:8px;">
+      <span style="font-size:11px;color:var(--muted);">🏆 <strong style="color:var(--text2);">${totals.totalShorts}</strong> Shorts · <strong style="color:var(--text2);">${totals.uniqueChannels}</strong> canales virales</span>
+      <span style="font-size:11px;color:var(--muted);">👁️ <strong style="color:var(--emerald);">${totals.totalViews.toLocaleString('en-US')}</strong> vistas totales</span>
+      <span style="font-size:11px;color:var(--muted);">📈 <strong style="color:var(--info-bright);">${totals.totalVPD.toLocaleString('en-US')}</strong> vistas/día</span>
+      <span style="font-size:11px;color:var(--muted);">💎 Viral Score: <strong style="color:${totals.avgViralScore > 70 ? 'var(--success)' : 'var(--warning)'};">${totals.avgViralScore}/100</strong></span>
+    </div>
+    <div style="display:flex;gap:4px;height:32px;align-items:flex-end;">
+      ${consolidated.slice(0, 10).map(ch => {
+        const h = Math.max(4, (ch.totalViews / maxViews) * 100);
+        const color = ch.totalViews > maxViews * 0.5 ? 'var(--info-bright)' : ch.totalViews > maxViews * 0.2 ? 'var(--info)' : 'var(--muted2)';
+        return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;">
+          <div style="font-size:7px;color:var(--muted2);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60px;">${ch.channel.substring(0, 8)}</div>
+          <div style="width:100%;height:${Math.round(h)}%;background:${color};border-radius:2px 2px 0 0;min-height:3px;" title="${ch.channel}: ${ch.totalViews.toLocaleString()} vistas"></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:9px;color:var(--muted2);margin-top:4px;">Top canales por vistas de Shorts</div>
+  </div></td></tr>`;
+
+  // Tabla de Shorts individuales
+  shorts.forEach((s, i) => {
+    const ageStr = s.age_days < 30 ? Math.round(s.age_days) + ' días'
+      : Math.round(s.age_days / 30) + ' meses';
+
+    const viralBadge = s.viralScore > 80
+      ? '<span style="font-size:8px;background:rgba(224,92,92,0.15);color:var(--danger);padding:1px 5px;border-radius:3px;font-weight:600;">🔥 VIRAL</span>'
+      : s.viralScore > 60
+      ? '<span style="font-size:8px;background:rgba(224,184,92,0.15);color:var(--warning);padding:1px 5px;border-radius:3px;font-weight:600;">⚡ TRENDING</span>'
+      : '<span style="font-size:8px;background:rgba(92,140,224,0.15);color:var(--info);padding:1px 5px;border-radius:3px;font-weight:600;">📈 ACTIVO</span>';
+
+    const viewsColor = s.views > 5000000 ? 'var(--danger)' : s.views > 1000000 ? 'var(--warning)' : 'var(--text)';
+
+    html += `
+      <tr class="na-node-row" style="background:rgba(92,140,224,0.02);">
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">${i + 1}</td>
+        <td>
+          <div style="font-size:12px;font-weight:500;color:var(--info-bright);">📱 ${s.channel}</div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:1px;">${viralBadge}</div>
+        </td>
+        <td>
+          <div style="font-size:12px;font-weight:500;color:var(--text2);">${s.title}</div>
+          <div style="font-size:9px;color:var(--muted2);margin-top:1px;">Score viral: ${s.viralScore}/100</div>
+        </td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:${viewsColor};">${s.views.toLocaleString('en-US')}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);">${ageStr}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${s.vph.toFixed(2)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);">${(s.estViewsPerDay || 0).toLocaleString()}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${s.est_usd_per_hour.toFixed(6)}</td>
+        <td style="text-align:center;">
+          <a href="${s.url}" target="_blank" class="na-node-link" title="Ver Short en YouTube">📱</a>
+        </td>
+      </tr>
+    `;
+  });
+
+  // Totales
+  const totalMonthlyLoss = totals.totalUSD * 730;
+  html += `
+    <tr style="background:var(--bg4);font-weight:700;">
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;padding:10px 8px;">—</td>
+      <td style="padding:10px 8px;" colspan="2"><strong style="color:var(--info-bright);">TOTAL SHORTS</strong></td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--emerald);padding:10px 8px;">${totals.totalViews.toLocaleString('en-US')}</td>
+      <td style="text-align:right;padding:10px 8px;">—</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--info-bright);padding:10px 8px;">${totals.totalVPH.toFixed(1)}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--accent);padding:10px 8px;">${totals.totalVPD.toLocaleString()}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--orange-bright);padding:10px 8px;">$${totals.totalUSD.toFixed(4)}</td>
+      <td style="text-align:center;padding:10px 8px;">—</td>
+    </tr>
+  `;
+
+  tbody.innerHTML = html;
+  updateShortsMetrics(shorts);
+
+  document.getElementById('na-export-btn').disabled = false;
+  document.getElementById('na-select-all-btn').style.display = 'none';
+  document.getElementById('na-deselect-btn').style.display = 'none';
+  document.getElementById('na-remove-btn').style.display = 'none';
+}
+
+/* ══════════════════════════════════════════════
+   MÉTRICAS
+   ══════════════════════════════════════════════ */
+
 function updateMetrics(nodes) {
-  // Only for node view; pirate view handles its own
   if (naState.naView === 'pirates') return;
+  if (naState.naView === 'shorts') return;
   let totalViews = 0;
   let totalVPH = 0;
   let totalUSD = 0;
@@ -909,6 +1191,22 @@ function updateMetrics(nodes) {
   document.getElementById('na-metric-views').textContent = totalViews.toLocaleString('en-US');
   document.getElementById('na-metric-vph').innerHTML = `${totalVPH.toFixed(2)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
   document.getElementById('na-metric-usd').textContent = `$${totalUSD.toFixed(4)}`;
+}
+
+function updateShortsMetrics(shorts) {
+  if (!shorts || shorts.length === 0) {
+    document.getElementById('na-metric-nodes').innerHTML = `0 <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">shorts</span>`;
+    document.getElementById('na-metric-views').textContent = '0';
+    document.getElementById('na-metric-vph').innerHTML = `0.00 <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
+    document.getElementById('na-metric-usd').textContent = '$0.0000';
+    return;
+  }
+
+  const totals = getShortsTotals(shorts);
+  document.getElementById('na-metric-nodes').innerHTML = `${totals.totalShorts} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">shorts</span>`;
+  document.getElementById('na-metric-views').innerHTML = `${totals.totalViews.toLocaleString('en-US')} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">virales</span>`;
+  document.getElementById('na-metric-vph').innerHTML = `${totals.totalVPH.toFixed(1)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
+  document.getElementById('na-metric-usd').innerHTML = `$${totals.totalUSD.toFixed(6)} <span style="font-size:11px;font-weight:400;color:var(--info-bright);font-family:var(--font);">/h shorts</span>`;
 }
 
 /* ── Estados ── */
@@ -928,14 +1226,16 @@ function showNodesReady(song, isExternal = false) {
   const info = document.getElementById('na-catalog-info');
   if (!info) return;
   info.style.display = 'block';
+  const shortCount = naState.shorts?.length || 0;
   info.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:${isExternal ? 'var(--bg4)' : 'rgba(46,204,113,0.06)'};border:0.5px solid ${isExternal ? 'var(--border)' : 'rgba(46,204,113,0.2)'};border-radius:var(--radius);">
       <span style="font-size:16px;">${isExternal ? '📦' : '✅'}</span>
       <div style="flex:1;font-size:11px;color:var(--muted);">
         ${isExternal
           ? `<strong style="color:var(--warning);">Catálogo externo:</strong> "${song.name}" no está en la base local. Los nodos son <strong>estimados</strong>.`
-          : `<strong style="color:var(--success-bright);">Catálogo auditado:</strong> "${song.name}" encontrado en <strong>${song.catalogName}</strong> · <strong>${song.nodes.toLocaleString('en-US')}</strong> nodos reales · <strong>${(song.views / 1000000).toFixed(1)}M</strong> vistas`
+          : `<strong style="color:var(--success-bright);">Catálogo auditado:</strong> "${song.name}" encontrado en <strong>${song.catalogName}</strong> · <strong>${song.nodes.toLocaleString('en-US')}</strong> nodos · <strong>${(song.views / 1000000).toFixed(1)}M</strong> vistas`
         }
+        ${shortCount > 0 ? ` · <strong style="color:var(--info-bright);">${shortCount} Shorts</strong> virales detectados` : ''}
       </div>
     </div>
   `;
@@ -947,6 +1247,7 @@ function showNodesReady(song, isExternal = false) {
 
 function exportNodeReport() {
   const nodes = naState.filteredNodes;
+  const shorts = naState.shortsFiltered;
   const query = naState.searchQuery;
 
   if (!nodes || nodes.length === 0) return;
@@ -955,6 +1256,7 @@ function exportNodeReport() {
   const pirates = nodes.filter(n => n.isPirate);
   const pirateConsolidated = consolidatePirateChannels(nodes);
   const pirateTotals = getPirateTotals(nodes);
+  const shortsTotals = getShortsTotals(shorts);
 
   nodes.forEach(n => {
     totalViews += n.views;
@@ -1005,8 +1307,29 @@ function exportNodeReport() {
     `;
   });
 
-  const totalMonthlyLoss = pirateTotals.totalUSD * 730;
+  // ── Filas de Shorts ──
+  let shortsRowsHtml = '';
+  if (shorts && shorts.length > 0) {
+    shorts.slice(0, 20).forEach((s, i) => {
+      shortsRowsHtml += `
+        <tr>
+          <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;">${i + 1}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#0284c7;"><b>📱 ${s.channel}</b></td>
+          <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;">${s.title}</td>
+          <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;">SHORT</td>
+          <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;font-weight:600;color:#0284c7;">${s.views.toLocaleString('en-US')}</td>
+          <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:11px;color:#6b7280;">${Math.round(s.age_days / 30)} meses</td>
+          <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#0284c7;font-weight:600;">${s.vph.toFixed(2)}</td>
+          <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#b45309;">$${s.est_usd_per_hour.toFixed(6)}</td>
+        </tr>
+      `;
+    });
+  }
 
+  const totalMonthlyLoss = pirateTotals.totalUSD * 730;
+  const shortsMonthlyLoss = shortsTotals.totalUSD * 730;
+
+  // ── Construir HTML ──
   const htmlTemplate = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1026,10 +1349,12 @@ function exportNodeReport() {
   .meta-box h3 { font-size: 13px; text-transform: uppercase; color: #0f172a; margin-bottom: 12px; letter-spacing: 0.03em; }
   .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
   .section-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #0f172a; }
+  .section-title-shorts { font-size: 15px; font-weight: 700; color: #0284c7; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #0284c7; }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
   thead th { background: #0f172a; color: #ffffff; padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
   thead th.r { text-align: right; }
   thead th.c { text-align: center; }
+  thead th.shorts-h { background: #0284c7; }
   tbody tr:nth-child(even) { background: #f1f5f9; }
   tbody tr:hover { background: #e2e8f0; }
   .totals-row { background: #0f172a !important; color: #ffffff; font-weight: 600; }
@@ -1039,6 +1364,7 @@ function exportNodeReport() {
   .badge-pirate { color: #dc2626; font-weight: 700; }
   .badge-blue { color: #0284c7; font-weight: 700; }
   .badge-amber { color: #b45309; font-weight: 700; }
+  .badge-short { color: #0284c7; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -1052,7 +1378,8 @@ function exportNodeReport() {
     <div class="header-right">
       <strong>Fecha de Emisión:</strong> ${dateStr}<br>
       <strong>Hora:</strong> ${timeStr}<br>
-      <strong>Tipo:</strong> Peritaje de Distribución Digital
+      <strong>Tipo:</strong> Peritaje de Distribución Digital<br>
+      <strong>Shorts Detectados:</strong> <span class="badge-short">${shortsTotals.totalShorts} virales</span>
     </div>
   </div>
 
@@ -1063,15 +1390,48 @@ function exportNodeReport() {
       <div><strong style="color:#64748b;">Obra Auditada:</strong> ${query}</div>
       <div><strong style="color:#64748b;">Nodos Consolidados:</strong> <span class="badge-blue">${nodes.length} nodos</span></div>
       <div><strong style="color:#64748b;">Reproducciones Acumuladas:</strong> <span style="color:#059669;font-weight:700;">${totalViews.toLocaleString('en-US')} vistas</span></div>
-      <div><strong style="color:#64748b;">Nodos Piratas Detectados:</strong> <span class="badge-pirate">${pirateTotals.totalPirates} nodos en ${pirateTotals.uniqueChannels} canales</span></div>
-      <div><strong style="color:#64748b;">VPH Combinado:</strong> <span class="badge-blue">${totalVPH.toFixed(2)} vistas/hora</span></div>
-      <div><strong style="color:#64748b;">VPH Robado por Piratas:</strong> <span class="badge-pirate">${pirateTotals.totalVPH.toFixed(1)} vistas/hora</span></div>
-      <div><strong style="color:#64748b;">Rendimiento Total Est.:</strong> <span class="badge-amber">$${totalUSD.toFixed(4)} USD/hora</span></div>
-      <div><strong style="color:#64748b;">Pérdida Mensual por Piratería:</strong> <span class="badge-pirate">$${(totalMonthlyLoss >= 1000 ? (totalMonthlyLoss / 1000).toFixed(1) + 'K' : totalMonthlyLoss.toFixed(0))}/mes</span></div>
+      <div><strong style="color:#64748b;">Shorts Virales:</strong> <span class="badge-short">${shortsTotals.totalShorts} Shorts en ${shortsTotals.uniqueChannels} canales</span></div>
+      <div><strong style="color:#64748b;">Nodos Piratas:</strong> <span class="badge-pirate">${pirateTotals.totalPirates} nodos en ${pirateTotals.uniqueChannels} canales</span></div>
+      <div><strong style="color:#64748b;">VPH Combinado (Nodos):</strong> <span class="badge-blue">${totalVPH.toFixed(2)} v/h</span></div>
+      <div><strong style="color:#64748b;">VPH Shorts:</strong> <span class="badge-short">${shortsTotals.totalVPH.toFixed(1)} v/h</span></div>
+      <div><strong style="color:#64748b;">Rendimiento USD/h:</strong> <span class="badge-amber">$${totalUSD.toFixed(4)} nodos / $${shortsTotals.totalUSD.toFixed(4)} shorts</span></div>
+      <div><strong style="color:#64748b;">Pérdida Piratas/mes:</strong> <span class="badge-pirate">$${(totalMonthlyLoss >= 1000 ? (totalMonthlyLoss / 1000).toFixed(1) + 'K' : totalMonthlyLoss.toFixed(0))}</span></div>
+      <div><strong style="color:#64748b;">Pérdida Shorts/mes:</strong> <span class="badge-short">$${(shortsMonthlyLoss >= 1000 ? (shortsMonthlyLoss / 1000).toFixed(1) + 'K' : shortsMonthlyLoss.toFixed(0))}</span></div>
     </div>
   </div>
 
+  <!-- Shorts Virales -->
+  ${shorts && shorts.length > 0 ? `
+  <div class="section-title-shorts">📱 Shorts Virales Identificados</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;text-align:center;">#</th>
+        <th style="width:190px;">Canal</th>
+        <th>Título del Short</th>
+        <th style="text-align:center;width:50px;">Tipo</th>
+        <th style="text-align:right;width:100px;">Vistas</th>
+        <th style="text-align:right;width:60px;">Edad</th>
+        <th style="text-align:right;width:65px;">VPH</th>
+        <th style="text-align:right;width:85px;">USD/h</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${shortsRowsHtml}
+      <tr class="totals-row">
+        <td style="text-align:center;padding:8px;">—</td>
+        <td style="padding:8px;font-weight:700;" colspan="2">TOTAL SHORTS</td>
+        <td style="text-align:center;padding:8px;">${shortsTotals.totalShorts}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;">${shortsTotals.totalViews.toLocaleString('en-US')}</td>
+        <td style="text-align:right;padding:8px;">—</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#0284c7;">${shortsTotals.totalVPH.toFixed(1)}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#b45309;">$${shortsTotals.totalUSD.toFixed(4)}</td>
+      </tr>
+    </tbody>
+  </table>` : ''}
+
   <!-- Piratas -->
+  ${pirateTotals.totalPirates > 0 ? `
   <div class="section-title">🏴‍☠️ Canales Piratas Identificados</div>
   <table>
     <thead>
@@ -1097,7 +1457,7 @@ function exportNodeReport() {
         <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#dc2626;">$${(totalMonthlyLoss >= 1000 ? (totalMonthlyLoss / 1000).toFixed(1) + 'K' : totalMonthlyLoss.toFixed(0))}</td>
       </tr>
     </tbody>
-  </table>
+  </table>` : ''}
 
   <!-- Nodos -->
   <div class="section-title">📋 Matriz Completa de Nodos</div>
@@ -1129,10 +1489,11 @@ function exportNodeReport() {
   </table>
 
   <div class="editable-note" contenteditable="true">
-    <strong>[ZONA EDITABLE — Haga clic aquí para personalizar]:</strong><br>
+    <strong>[ZONA EDITABLE]:</strong><br>
     El presente documento certifica la dispersión de tráfico de la obra musical indicada en redes abiertas.
-    Se identificaron y curaron manualmente los nodos de terceros, incluyendo <strong>${pirateTotals.uniqueChannels} canales piratas</strong> que operan sin licencia.
-    Este reporte sirve como base técnica para acciones legales, reclamación de regalías (DMCA, Content ID), y gestión de cartera de activos digitales.
+    Se identificaron y curaron manualmente <strong>${nodes.length} nodos</strong> de terceros,
+    incluyendo <strong>${pirateTotals.uniqueChannels} canales piratas</strong> y <strong>${shortsTotals.uniqueChannels} canales de Shorts virales</strong>
+    que operan sin licencia o generan réplicas de contenido.
     <br><br>
     <strong>Observaciones del Perito:</strong><br>
     _________________________________________________________________________________<br>
@@ -1141,7 +1502,7 @@ function exportNodeReport() {
   </div>
 
   <div class="footer">
-    Nuclear AIMA · Sistema de Auditoría Forense de Activos Digitales · Generado automáticamente el ${dateStr}
+    Nuclear AIMA · Sistema de Auditoría Forense de Activos Digitales + Shorts · Generado el ${dateStr}
   </div>
 
 </div>
@@ -1165,15 +1526,12 @@ function exportNodeReport() {
 }
 
 /* ══════════════════════════════════════════════
-   INIT
-   ══════════════════════════════════════════════ */
-
-/* ══════════════════════════════════════════════
    EXPORTAR A PDF
    ══════════════════════════════════════════════ */
 
 function exportNodePDF() {
   const nodes = naState.filteredNodes;
+  const shorts = naState.shortsFiltered;
   const query = naState.searchQuery;
   if (!nodes || nodes.length === 0) return;
 
@@ -1189,6 +1547,7 @@ function exportNodePDF() {
   let totalViews = 0, totalVPH = 0, totalUSD = 0;
   const pirates = nodes.filter(n => n.isPirate);
   const pirateTotals = getPirateTotals(nodes);
+  const shortsTotals = getShortsTotals(shorts);
 
   nodes.forEach(n => {
     totalViews += n.views; totalVPH += n.vph; totalUSD += n.est_usd_per_hour;
@@ -1201,9 +1560,9 @@ function exportNodePDF() {
   doc.setFontSize(16);
   doc.setTextColor(201, 169, 110);
   doc.text('Nuclear AIMA · Node Auditor', 14, 15);
-  doc.setFontSize(8);
+  doc.setFontSize(7);
   doc.setTextColor(120, 120, 120);
-  doc.text(dateStr, pageW - 14, 15, { align: 'right' });
+  doc.text(dateStr + ' | Shorts: ' + shortsTotals.totalShorts, pageW - 14, 15, { align: 'right' });
 
   // ── Línea ──
   doc.setDrawColor(201, 169, 110);
@@ -1213,10 +1572,10 @@ function exportNodePDF() {
   doc.setFontSize(11);
   doc.setTextColor(220, 220, 220);
   doc.text('Obra: ' + query, 14, 26);
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
   doc.text('Nodos: ' + nodes.length + ' | Vistas: ' + totalViews.toLocaleString('en-US') + ' | VPH: ' + totalVPH.toFixed(2) + ' | USD/h: ' + totalUSD.toFixed(4), 14, 31);
-  doc.text('Piratas: ' + pirateTotals.totalPirates + ' nodos en ' + pirateTotals.uniqueChannels + ' canales', 14, 36);
+  doc.text('Piratas: ' + pirateTotals.totalPirates + ' nodos en ' + pirateTotals.uniqueChannels + ' canales | Shorts: ' + shortsTotals.totalShorts + ' virales', 14, 36);
 
   // ── Tabla ──
   const colX = [14, 110, 145, 175, 200, 225, 250];
@@ -1253,7 +1612,7 @@ function exportNodePDF() {
     doc.setTextColor(220, 160, 80);
     doc.text('$' + n.est_usd_per_hour.toFixed(4), colX[4], y, { align: 'right' });
     doc.setTextColor(150, 150, 150);
-    doc.text(n.isPirate ? 'PIRATA' : n.isOfficial ? 'OFICIAL' : 'COVER', colX[5], y);
+    doc.text(n.isPirate ? 'PIRATA' : n.isOfficial ? 'OFICIAL' : n.type === 'short' ? 'SHORT' : 'COVER', colX[5], y);
     y += 4;
   });
 
@@ -1262,7 +1621,7 @@ function exportNodePDF() {
   doc.line(14, y + 4, pageW - 14, y + 4);
   doc.setFontSize(6);
   doc.setTextColor(100, 100, 100);
-  doc.text('Nuclear AIMA · Sistema de Auditoría Forense de Activos Digitales · Generado: ' + dateStr, pageW / 2, y + 10, { align: 'center' });
+  doc.text('Nuclear AIMA · Sistema de Auditoría Forense de Activos Digitales + Shorts · Generado: ' + dateStr, pageW / 2, y + 10, { align: 'center' });
 
   const filename = `Auditoria_${query.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 30)}.pdf`;
   doc.save(filename);
@@ -1286,3 +1645,4 @@ window.exportNodePDF = exportNodePDF;
 window.switchNAView = switchNAView;
 window.auditSingleSong = auditSingleSong;
 window.auditAllArtistSongs = auditAllArtistSongs;
+window.renderShortsView = renderShortsView;

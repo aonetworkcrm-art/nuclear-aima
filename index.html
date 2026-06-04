@@ -194,6 +194,24 @@
             <div style="position:absolute;top:0;left:0;font-size:8px;padding:2px 6px;border-radius:8px 0 8px 0;cursor:pointer;color:var(--muted2);transition:color 0.15s;" onclick="event.stopPropagation();exportFugitiveReport()" title="Exportar reporte PDF" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color=''">📄 PDF</div>
             <div class="live-badge" style="position:absolute;top:0;right:0;font-size:9px;background:rgba(224,92,92,0.2);color:#e05c5c;padding:2px 8px;border-radius:0 8px 0 8px;font-weight:600;">🔴 EN VIVO</div>          <div style="position:absolute;bottom:0;right:0;font-size:8px;color:var(--muted2);padding:2px 6px;">↗️ Desglose</div>
         </div>
+
+        <!-- ═══ SHORTS DASHBOARD CARD ═══ -->
+        <div class="stat-card stat-card-shorts" id="dash-shorts-card" onclick="showShortsBreakdown()" title="Haz clic para ver detalle de Shorts virales" style="border-color:rgba(92,140,224,0.3);cursor:pointer;">
+          <div class="stat-icon" style="background:rgba(92,140,224,0.15);">📱</div>
+          <div class="stat-label" style="color:var(--info-bright);">YouTube Shorts Virales</div>
+          <div class="stat-value" id="dash-shorts-views" style="color:var(--info-bright);font-size:20px;">—</div>
+          <div class="stat-sub">
+            <span id="dash-shorts-count" style="color:var(--info-bright);font-weight:700;">—</span> Shorts · 
+            <span id="dash-shorts-channels" style="color:var(--accent);font-weight:700;">—</span> canales virales
+          </div>
+          <div id="dash-shorts-vpd" style="font-size:10px;color:var(--muted);margin-top:3px;">📈 — vistas/día combinadas</div>
+          <div id="dash-shorts-usd" style="font-size:10px;color:var(--muted2);margin-top:1px;">💰 — USD/h en Shorts</div>
+          <div style="margin-top:8px;display:flex;gap:3px;height:24px;align-items:flex-end;" id="dash-shorts-bar-chart">
+            <div style="flex:1;height:0%;background:var(--bg4);border-radius:2px 2px 0 0;"></div>
+          </div>
+          <div style="position:absolute;top:0;right:0;font-size:8px;padding:2px 6px;border-radius:0 8px 0 8px;background:rgba(92,140,224,0.12);color:var(--info-bright);font-weight:600;">📱 NEW</div>
+          <div style="position:absolute;bottom:0;right:0;font-size:8px;color:var(--muted2);padding:2px 6px;">↗️ Detalle</div>
+        </div>
       </div>
 
         <!-- ═══ RECOVERY CARD: REGALÍAS PERDIDAS ═══ -->
