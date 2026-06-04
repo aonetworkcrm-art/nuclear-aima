@@ -1985,6 +1985,18 @@ const TRENDING_GENRES = [
   { id: 'hip-hop', label: '🎤 Hip-Hop', icon: '🎤' },
 ];
 
+function reloadTrendingShorts() {
+  if (_trendingShortsLoading) return;
+  var btn = document.getElementById('trending-reload-btn');
+  if (btn) { btn.textContent = '\u23f3'; btn.style.color = 'var(--accent)'; }
+  _trendingShortsCache = null;
+  _trendingGenre = 'all';
+  fetchTrendingShorts();
+  setTimeout(function() {
+    if (btn) { btn.textContent = String.fromCharCode(0x1f504); btn.style.color = ''; }
+  }, 2000);
+}
+
 function updateTrendingShortsDashboard() {
   _trendingShortsCache = null;
   fetchTrendingShorts();
