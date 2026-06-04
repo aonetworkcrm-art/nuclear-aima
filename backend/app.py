@@ -66,12 +66,11 @@ def audit_node():
 
     logger.info(f"Auditando: '{query}' | max_nodes={max_nodes} | cpm={cpm}")
 
+    scraper = YouTubeScraper(headless=headless, timeout=20)
     try:
-        scraper = YouTubeScraper(headless=headless, timeout=20)
         nodes = scraper.search_song(query, max_results=max_nodes)
         song_info = scraper.get_song_info(nodes)
 
-        # Asignar USD/h estimado a cada nodo
         for n in nodes:
             n['est_usd_per_hour'] = round((n['vph'] * cpm) / 1000, 6)
             n['type'] = 'pirate' if n['isPirate'] else ('official' if n['isOfficial'] else 'cover')
@@ -86,15 +85,13 @@ def audit_node():
             'total': len(nodes),
             'message': f'Extraídos {len(nodes)} nodos para "{query}"'
         })
-
     except Exception as e:
         logger.error(f"Error en auditoría: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            'status': 'error',
-            'message': f'Error durante la auditoría: {str(e)}'
-        }), 500
+        return jsonify({'status': 'error', 'message': f'Error: {str(e)}'}), 500
+    finally:
+        scraper.close()
 
 
 @app.route('/api/audit/batch', methods=['POST'])

@@ -288,6 +288,9 @@ class YouTubeScraper:
 if __name__ == '__main__':
     import json
     scraper = YouTubeScraper(headless=True)
-    nodes = scraper.search_song('Ramón Orlando - Te Compro Tu Novia', max_results=30)
-    info = scraper.get_song_info(nodes)
-    print(json.dumps({'nodes': nodes[:5], 'info': info}, indent=2, ensure_ascii=False))
+    try:
+        nodes = scraper.search_song('Ramón Orlando - Te Compro Tu Novia', max_results=30)
+        info = scraper.get_song_info(nodes)
+        print(json.dumps({'nodes': nodes[:5], 'info': info}, indent=2, ensure_ascii=False))
+    finally:
+        scraper.close()
