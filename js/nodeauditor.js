@@ -1,7 +1,19 @@
 /* ══════════════════════════════════════════════
-   NUCLEAR AIMA — NODE AUDITOR v1.0
+   NUCLEAR AIMA — NODE AUDITOR v1.1
    Auditoría Forense de Nodos Musicales
+   Detección y Consolidación de Canales Piratas
    ══════════════════════════════════════════════ */
+
+/* ── Canales Piratas Conocidos ── */
+const PIRATE_CHANNELS = [
+  'Karin Records', 'Karin Records RD', 'Karin Music',
+  'Música Sin Fronteras', 'Latin Music Pirate', 'Merengue Full HD',
+  'Exitos del Ayer', 'Música Sin Copyright', 'Sabor Latino HD',
+  'El Bombazo Musical', 'Ritmo y Sabor', 'Tropical Hits',
+  'Merengue Manía', 'Pura Musica Latina', 'Latinos por el Mundo',
+  'Música Sin Dueño', 'Exitos Latinos', 'El Merengue No Muere',
+  'Bailando Con Todo', 'Fiesta Latina Total'
+];
 
 /* ── Estado del auditor ── */
 let naState = {
@@ -12,7 +24,8 @@ let naState = {
   maxNodes: 100,
   cpm: 1.50,
   isLoading: false,
-  selectedIds: new Set()
+  selectedIds: new Set(),
+  naView: 'nodes' // 'nodes' | 'pirates'
 };
 
 /* ── Referencias globales (se resuelven al usar) ── */
@@ -28,11 +41,20 @@ function getAuditedSongs() {
   return window.AUDITED_SONGS || [];
 }
 
+/* ── Determina si un canal es pirata ── */
+function isPirateChannel(channelName) {
+  const name = channelName.toLowerCase();
+  return PIRATE_CHANNELS.some(p => name.includes(p.toLowerCase())) ||
+    name.includes('pirate') ||
+    name.includes('sin copyright') ||
+    name.includes('sin due') ||
+    name.includes('full hd');
+}
+
 /* ══════════════════════════════════════════════
    GENERACIÓN DE NODOS (basada en datos reales)
    ══════════════════════════════════════════════ */
 
-/* Generador pseudo-aleatorio determinista */
 function seededRandom(seed) {
   const x = Math.sin(seed * 9301 + 49297) * 49297;
   return x - Math.floor(x);
@@ -46,48 +68,59 @@ function generateNodesForSong(song, count) {
 
   const seedBase = song.name.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
 
-  // Distribución power-law: pocos nodos concentran la mayoría de vistas
+  const officialChannels = [
+    'Ramón Orlando Oficial', 'Ramón Orlando VEVO', 'Ramón Orlando Topic'
+  ];
+  const normalChannels = [
+    'Música Dominicana', 'Merengue Clásico',
+    'Latin Hits Archive', 'Bailando Merengue', 'Sabor Tropical',
+    'Clásicos del Merengue', 'Ritmo Latino', 'Fania Records Archive',
+    'El Gran Merengue', 'Música de República Dominicana', 'Latin Music Vault',
+    'Merengue VIP', 'Bachata y Merengue TV', 'Tropical Beats',
+    'Sonido Dominicano', 'Merengue de Colección'
+  ];
+
+  // Distribución power-law
   for (let i = 0; i < actualCount; i++) {
     const seed = seedBase + i * 7;
     const r = seededRandom(seed);
 
-    // Power-law: el primer nodo tiene ~15% de vistas, el último ~0.01%
     const rank = i + 1;
-    const viewShare = (1 / Math.pow(rank, 1.2)) / 
+    const viewShare = (1 / Math.pow(rank, 1.2)) /
       Array.from({ length: actualCount }, (_, j) => 1 / Math.pow(j + 1, 1.2)).reduce((a, b) => a + b, 0);
 
     const nodeViews = Math.round(baseViews * viewShare);
-    const nodeAgeDays = Math.round(100 + r * 5000); // 100 días a ~14 años
+    const nodeAgeDays = Math.round(100 + r * 5000);
     const nodeAgeHours = nodeAgeDays * 24;
     const vph = nodeAgeHours > 0 ? +(nodeViews / nodeAgeHours).toFixed(2) : 0;
     const usdPerHour = +((vph * naState.cpm) / 1000).toFixed(6);
 
-    // Determinar si el nodo es oficial, cover, o repositorio
-    let type = 'cover';
-    let typeLabel = 'Cover';
-    if (i === 0 && r > 0.5) {
-      type = 'official';
-      typeLabel = 'Oficial';
-    } else if (r > 0.8) {
-      type = 'repo';
-      typeLabel = 'Repositorio';
-    } else if (r > 0.6) {
-      type = 'lyrics';
-      typeLabel = 'Lyrics';
-    }
+    // Asignar tipo y canal
+    let type, typeLabel, channel, isPirate;
 
-    const channelNames = [
-      'Ramón Orlando Oficial', 'Música Dominicana', 'Merengue Clásico',
-      'Latin Hits Archive', 'Bailando Merengue', 'Sabor Tropical',
-      'Clásicos del Merengue', 'Ritmo Latino', 'Fania Records Archive',
-      'El Gran Merengue', 'Música de República Dominicana', 'Latin Music Vault',
-      'Merengue VIP', 'Bachata y Merengue TV', 'Tropical Beats'
-    ];
-    const channel = i < 3 ? channelNames[i] : channelNames[Math.floor(r * channelNames.length)];
+    if (i < 2) {
+      // Top 2: oficiales
+      type = 'official'; typeLabel = 'Oficial';
+      channel = officialChannels[i];
+      isPirate = false;
+    } else if (r > 0.65) {
+      // ~35%: canales piratas
+      type = 'pirate'; typeLabel = '🏴‍☠️ Pirata';
+      const pIdx = Math.floor(seededRandom(seed + 999) * PIRATE_CHANNELS.length);
+      channel = PIRATE_CHANNELS[pIdx];
+      isPirate = true;
+    } else {
+      // Resto: canales legítimos no-oficiales
+      type = r > 0.4 ? 'cover' : 'repo';
+      typeLabel = type === 'cover' ? 'Cover' : 'Repositorio';
+      const nIdx = Math.floor(seededRandom(seed + 777) * normalChannels.length);
+      channel = normalChannels[nIdx];
+      isPirate = false;
+    }
 
     nodes.push({
       id: i + 1,
-      title: `${song.name}${i === 0 ? ' (Video Oficial)' : i === 1 ? ' (Audio)' : i % 2 === 0 ? ' (En Vivo)' : ' (Cover)'}`,
+      title: `${song.name}${i === 0 ? ' (Video Oficial)' : i === 1 ? ' (Audio Oficial)' : type === 'pirate' ? ' (Cover HD)' : ' (En Vivo)'}`,
       channel,
       url: `https://www.youtube.com/results?search_query=${encodeURIComponent(song.name + ' ' + channel)}`,
       views: nodeViews,
@@ -97,16 +130,55 @@ function generateNodesForSong(song, count) {
       type,
       typeLabel,
       isOfficial: type === 'official',
+      isPirate,
       selected: true
     });
   }
 
-  // Ordenar por vistas descendente
   nodes.sort((a, b) => b.views - a.views);
-  // Reasignar IDs después de ordenar
   nodes.forEach((n, i) => { n.id = i + 1; });
 
   return nodes;
+}
+
+/* ══════════════════════════════════════════════
+   CONSOLIDACIÓN POR CANAL PIRATA
+   ══════════════════════════════════════════════ */
+
+function consolidatePirateChannels(nodes) {
+  const pirateNodes = nodes.filter(n => n.isPirate);
+  const byChannel = {};
+
+  pirateNodes.forEach(n => {
+    if (!byChannel[n.channel]) {
+      byChannel[n.channel] = {
+        channel: n.channel,
+        songs: [],
+        totalViews: 0,
+        totalVPH: 0,
+        totalUSD: 0,
+        nodeCount: 0
+      };
+    }
+    byChannel[n.channel].songs.push(n);
+    byChannel[n.channel].totalViews += n.views;
+    byChannel[n.channel].totalVPH += n.vph;
+    byChannel[n.channel].totalUSD += n.est_usd_per_hour;
+    byChannel[n.channel].nodeCount++;
+  });
+
+  return Object.values(byChannel).sort((a, b) => b.totalViews - a.totalViews);
+}
+
+function getPirateTotals(nodes) {
+  const pirates = nodes.filter(n => n.isPirate);
+  return {
+    totalPirates: pirates.length,
+    uniqueChannels: new Set(pirates.map(n => n.channel)).size,
+    totalViews: pirates.reduce((a, n) => a + n.views, 0),
+    totalVPH: pirates.reduce((a, n) => a + n.vph, 0),
+    totalUSD: pirates.reduce((a, n) => a + n.est_usd_per_hour, 0)
+  };
 }
 
 /* ══════════════════════════════════════════════
@@ -118,15 +190,15 @@ function searchNodes(query, maxNodes, cpm) {
   naState.maxNodes = parseInt(maxNodes) || 100;
   naState.cpm = parseFloat(cpm) || 1.50;
   naState.selectedIds = new Set();
+  naState.naView = 'nodes';
 
   if (!naState.searchQuery) {
     showEmptyState('Ingresa el nombre de una canción o artista para comenzar la auditoría.');
     return;
   }
 
-  // Buscar en el catálogo existente
   const allSongs = getCatalogSongs();
-  const match = allSongs.find(s => 
+  const match = allSongs.find(s =>
     s.name.toLowerCase().includes(naState.searchQuery) ||
     naState.searchQuery.includes(s.name.toLowerCase())
   );
@@ -138,7 +210,6 @@ function searchNodes(query, maxNodes, cpm) {
     renderResults();
     showNodesReady(match);
   } else {
-    // Buscar también en audited songs directamente
     const audited = getAuditedSongs();
     const matchAudited = audited.find(s =>
       s.name.toLowerCase().includes(naState.searchQuery) ||
@@ -151,7 +222,6 @@ function searchNodes(query, maxNodes, cpm) {
       renderResults();
       showNodesReady(matchAudited);
     } else {
-      // No encontrado en catálogo — generar datos estimados
       const estimatedSong = {
         name: query.trim(),
         views: Math.round(5000000 + Math.random() * 20000000),
@@ -171,7 +241,7 @@ function searchNodes(query, maxNodes, cpm) {
 }
 
 /* ══════════════════════════════════════════════
-   CURACIÓN (Seleccionar / Eliminar Nodos)
+   CURACIÓN
    ══════════════════════════════════════════════ */
 
 function toggleNodeSelection(id) {
@@ -222,18 +292,25 @@ function updateSelectionUI() {
   }
 }
 
+/* ── Cambiar vista ── */
+function switchNAView(view) {
+  naState.naView = view;
+  renderResults();
+  // Update tab UI
+  document.querySelectorAll('.na-view-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.view === view);
+  });
+}
+
 /* ══════════════════════════════════════════════
    RENDERIZADO
    ══════════════════════════════════════════════ */
 
 function renderNodeAuditor() {
   const container = document.getElementById('nodeauditor-container');
-
-  // Inicializar la búsqueda con la canción de ejemplo
   const defaultQuery = 'Te Compro Tu Novia';
 
   container.innerHTML = `
-    <!-- Panel de control -->
     <div class="na-control-panel">
       <div class="na-control-header">
         <span class="na-control-title">🔍 Parámetros de Auditoría de Nodos</span>
@@ -288,45 +365,35 @@ function renderNodeAuditor() {
     <div class="na-table-wrapper">
       <div class="na-table-toolbar">
         <div class="na-table-toolbar-left">
-          <span id="na-nodes-info" style="font-size:12px;color:var(--muted);">Sin datos — realiza una búsqueda</span>
-          <span id="na-selection-bar" style="font-size:11px;color:var(--muted);margin-left:12px;"></span>
+          <!-- View Tabs -->
+          <div class="na-view-tabs">
+            <button class="na-view-tab active" data-view="nodes" onclick="switchNAView('nodes')">
+              📋 Nodos <span id="na-tab-nodes-count" style="font-size:9px;opacity:0.7;"></span>
+            </button>
+            <button class="na-view-tab" data-view="pirates" onclick="switchNAView('pirates')">
+              🏴‍☠️ Piratas <span id="na-tab-pirates-count" style="font-size:9px;opacity:0.7;"></span>
+            </button>
+          </div>
+          <span id="na-nodes-info" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
+          <span id="na-selection-bar" style="font-size:11px;color:var(--muted);margin-left:8px;"></span>
         </div>
         <div class="na-table-toolbar-right">
-          <button class="btn btn-xs btn-ghost" onclick="selectAllNodes()" style="font-size:10px;">✅ Seleccionar todos</button>
-          <button class="btn btn-xs btn-ghost" onclick="deselectAllNodes()" style="font-size:10px;">❌ Deseleccionar</button>
-          <button class="btn btn-xs btn-ghost" onclick="removeSelectedNodes()" id="na-remove-btn" style="font-size:10px;color:var(--danger);display:none;">🗑️ Eliminar seleccionados</button>
+          <button class="btn btn-xs btn-ghost" onclick="selectAllNodes()" style="font-size:10px;display:none;" id="na-select-all-btn">✅ Todos</button>
+          <button class="btn btn-xs btn-ghost" onclick="deselectAllNodes()" style="font-size:10px;display:none;" id="na-deselect-btn">❌ Ninguno</button>
+          <button class="btn btn-xs btn-ghost" onclick="removeSelectedNodes()" id="na-remove-btn" style="font-size:10px;color:var(--danger);display:none;">🗑️ Eliminar</button>
           <button class="btn btn-xs" onclick="exportNodeReport()" id="na-export-btn" disabled style="font-size:10px;background:var(--accent);color:#0d0d0f;">📥 Exportar Auditoría</button>
         </div>
       </div>
       <div class="na-table-scroll">
-        <table class="na-table" id="na-node-table">
-          <thead>
-            <tr>
-              <th style="width:36px;text-align:center;">✓</th>
-              <th style="width:44px;">#</th>
-              <th>Título del Nodo</th>
-              <th>Canal</th>
-              <th style="text-align:right;">Vistas</th>
-              <th style="text-align:right;">Antigüedad</th>
-              <th style="text-align:right;">VPH</th>
-              <th style="text-align:right;">USD/h</th>
-              <th style="text-align:center;width:50px;">🔗</th>
-            </tr>
-          </thead>
-          <tbody id="na-node-tbody">
-            <tr>
-              <td colspan="9" style="text-align:center;padding:40px 16px;color:var(--muted2);font-size:12px;">
-                <div style="font-size:32px;margin-bottom:8px;">🔍</div>
-                Ingresa una canción (ej. <strong>"Te Compro Tu Novia"</strong>) y haz clic en <strong>"Iniciar Extracción"</strong><br>
-                <span style="font-size:10px;color:var(--muted2);">Basado en los datos reales del catálogo de Ramón Orlando (3,350+ nodos)</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div id="na-table-container">
+          <table class="na-table" id="na-node-table">
+            <thead id="na-table-head"></thead>
+            <tbody id="na-node-tbody"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- Info del catálogo -->
     <div class="na-catalog-info" id="na-catalog-info" style="display:none;"></div>
   `;
 }
@@ -346,10 +413,34 @@ function executeNodeSearch() {
   }, 300);
 }
 
-/* ── Mostrar resultados ── */
+/* ── Renderizar vista actual ── */
 function renderResults() {
+  if (naState.naView === 'pirates') {
+    renderPirateView();
+  } else {
+    renderNodeView();
+  }
+}
+
+/* ── Vista de Nodos individuales ── */
+function renderNodeView() {
+  const thead = document.getElementById('na-table-head');
   const tbody = document.getElementById('na-node-tbody');
   const nodes = naState.filteredNodes;
+
+  thead.innerHTML = `
+    <tr>
+      <th style="width:36px;text-align:center;">✓</th>
+      <th style="width:36px;">#</th>
+      <th>Título del Nodo</th>
+      <th style="width:160px;">Canal</th>
+      <th style="text-align:right;">Vistas</th>
+      <th style="text-align:right;">Antigüedad</th>
+      <th style="text-align:right;">VPH</th>
+      <th style="text-align:right;">USD/h</th>
+      <th style="text-align:center;width:54px;">🔗</th>
+    </tr>
+  `;
 
   if (!nodes || nodes.length === 0) {
     tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px 16px;color:var(--muted2);font-size:12px;">
@@ -357,6 +448,9 @@ function renderResults() {
     </td></tr>`;
     updateMetrics([]);
     document.getElementById('na-export-btn').disabled = true;
+    document.getElementById('na-select-all-btn').style.display = 'none';
+    document.getElementById('na-deselect-btn').style.display = 'none';
+    document.getElementById('na-tab-pirates-count').textContent = '';
     return;
   }
 
@@ -369,11 +463,14 @@ function renderResults() {
 
     let typeBadge = '';
     if (n.type === 'official') typeBadge = '<span style="font-size:8px;background:rgba(46,204,113,0.15);color:var(--success-bright);padding:1px 5px;border-radius:3px;font-weight:600;">OFICIAL</span>';
+    else if (n.isPirate) typeBadge = '<span style="font-size:8px;background:rgba(224,92,92,0.15);color:var(--danger);padding:1px 5px;border-radius:3px;font-weight:600;">🏴‍☠️ PIRATA</span>';
     else if (n.type === 'lyrics') typeBadge = '<span style="font-size:8px;background:rgba(77,171,247,0.15);color:var(--info-bright);padding:1px 5px;border-radius:3px;font-weight:600;">LYRICS</span>';
     else typeBadge = '<span style="font-size:8px;background:rgba(255,255,255,0.05);color:var(--muted2);padding:1px 5px;border-radius:3px;font-weight:600;">COVER</span>';
 
+    const rowBg = n.isPirate ? 'style="background:rgba(224,92,92,0.03);"' : '';
+
     html += `
-      <tr class="na-node-row ${isSelected ? 'na-row-selected' : ''}" data-node-id="${n.id}">
+      <tr class="na-node-row ${isSelected ? 'na-row-selected' : ''}" ${rowBg} data-node-id="${n.id}">
         <td style="text-align:center;">
           <input type="checkbox" class="na-node-checkbox" data-node-id="${n.id}"
             ${isSelected ? 'checked' : ''}
@@ -385,15 +482,15 @@ function renderResults() {
           <div style="font-size:10px;color:var(--muted2);margin-top:1px;">${typeBadge}</div>
         </td>
         <td>
-          <div style="font-size:11px;color:var(--text2);">${n.channel}</div>
+          <div style="font-size:11px;color:${n.isPirate ? 'var(--danger)' : 'var(--text2)'};">${n.channel}</div>
         </td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--text);">${n.views.toLocaleString('en-US')}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);">${ageStr}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${n.vph.toFixed(2)}</td>
-        <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${n.est_usd_per_hour.toFixed(4)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:12px;color:${n.isPirate ? 'var(--danger)' : 'var(--orange-bright)'};">$${n.est_usd_per_hour.toFixed(4)}</td>
         <td style="text-align:center;">
           <a href="${n.url}" target="_blank" class="na-node-link" title="Ver nodo en YouTube">🔗</a>
-          <button class="na-node-remove" onclick="removeNode(${n.id})" title="Eliminar nodo de la auditoría">✕</button>
+          <button class="na-node-remove" onclick="removeNode(${n.id})" title="Eliminar nodo">✕</button>
         </td>
       </tr>
     `;
@@ -402,30 +499,135 @@ function renderResults() {
   tbody.innerHTML = html;
   updateMetrics(nodes);
 
-  // Actualizar toolbar
   const info = document.getElementById('na-nodes-info');
   const totalNodes = naState.nodes.length;
   const shownNodes = nodes.length;
   info.innerHTML = shownNodes < totalNodes
-    ? `Mostrando <strong>${shownNodes}</strong> de <strong>${totalNodes}</strong> nodos`
-    : `<strong>${totalNodes}</strong> nodos en matriz`;
+    ? `<strong>${shownNodes}</strong> de <strong>${totalNodes}</strong> nodos`
+    : `<strong>${totalNodes}</strong> nodos`;
+
+  // Update pirate tab count
+  const pirateCount = nodes.filter(n => n.isPirate).length;
+  document.getElementById('na-tab-pirates-count').textContent = `(${pirateCount})`;
 
   document.getElementById('na-export-btn').disabled = false;
+  document.getElementById('na-select-all-btn').style.display = 'inline-flex';
+  document.getElementById('na-deselect-btn').style.display = 'inline-flex';
   document.getElementById('na-remove-btn').style.display = 'inline-flex';
 }
 
-/* ── Métricas consolidadas ── */
+/* ── Vista Consolidada de Canales Piratas ── */
+function renderPirateView() {
+  const thead = document.getElementById('na-table-head');
+  const tbody = document.getElementById('na-node-tbody');
+  const nodes = naState.filteredNodes;
+  const pirates = nodes.filter(n => n.isPirate);
+  const consolidated = consolidatePirateChannels(nodes);
+  const totals = getPirateTotals(nodes);
+
+  thead.innerHTML = `
+    <tr>
+      <th style="width:36px;">#</th>
+      <th style="width:180px;">Canal Pirata</th>
+      <th style="text-align:center;">Canciones</th>
+      <th style="text-align:right;">Vistas Robadas</th>
+      <th style="text-align:right;">VPH Total</th>
+      <th style="text-align:right;">USD/h Robado</th>
+      <th style="text-align:right;">Pérdida Est./mes</th>
+      <th style="text-align:center;width:60px;">Acción</th>
+    </tr>
+  `;
+
+  if (pirates.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px 16px;color:var(--muted2);font-size:12px;">
+      🏴‍☠️ No se detectaron canales piratas en esta búsqueda.
+    </td></tr>`;
+    updateMetrics(nodes);
+    document.getElementById('na-export-btn').disabled = false;
+    document.getElementById('na-select-all-btn').style.display = 'none';
+    document.getElementById('na-deselect-btn').style.display = 'none';
+    document.getElementById('na-remove-btn').style.display = 'none';
+    return;
+  }
+
+  let html = '';
+  consolidated.forEach((ch, i) => {
+    const monthlyLoss = ch.totalUSD * 730; // ~730 horas/mes
+    const monthlyStr = monthlyLoss >= 1000
+      ? '$' + (monthlyLoss / 1000).toFixed(1) + 'K'
+      : '$' + monthlyLoss.toFixed(0);
+
+    // Top songs from this channel
+    const topSongs = ch.songs.slice(0, 3).map(s => s.title.split(' (')[0]).join(', ');
+    const extra = ch.songs.length > 3 ? ` y ${ch.songs.length - 3} más` : '';
+
+    html += `
+      <tr class="na-node-row" style="background:rgba(224,92,92,0.03);">
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">${i + 1}</td>
+        <td>
+          <div style="font-size:13px;font-weight:600;color:var(--danger);">🏴‍☠️ ${ch.channel}</div>
+          <div style="font-size:10px;color:var(--muted2);margin-top:2px;">${topSongs}${extra}</div>
+        </td>
+        <td style="text-align:center;font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text);">${ch.nodeCount}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--emerald);">${ch.totalViews.toLocaleString('en-US')}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--info-bright);">${ch.totalVPH.toFixed(1)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--danger);">$${ch.totalUSD.toFixed(4)}</td>
+        <td style="text-align:right;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--orange-bright);">${monthlyStr}</td>
+        <td style="text-align:center;">
+          <a href="https://www.youtube.com/results?search_query=${encodeURIComponent(ch.channel)}" target="_blank" class="na-node-link" title="Buscar canal en YouTube">🔍</a>
+        </td>
+      </tr>
+    `;
+  });
+
+  // Totales fila
+  const totalMonthlyLoss = totals.totalUSD * 730;
+  const totalMonthlyStr = totalMonthlyLoss >= 1000
+    ? '$' + (totalMonthlyLoss / 1000).toFixed(1) + 'K'
+    : '$' + totalMonthlyLoss.toFixed(0);
+
+  html += `
+    <tr style="background:var(--bg4);font-weight:700;">
+      <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;padding:10px 8px;">—</td>
+      <td style="font-size:13px;color:var(--danger);padding:10px 8px;"><strong>TOTAL PIRATAS</strong></td>
+      <td style="text-align:center;font-family:var(--mono);font-size:14px;color:var(--text);padding:10px 8px;">${totals.totalPirates}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--emerald);padding:10px 8px;">${totals.totalViews.toLocaleString('en-US')}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--info-bright);padding:10px 8px;">${totals.totalVPH.toFixed(1)}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--danger);padding:10px 8px;">$${totals.totalUSD.toFixed(4)}</td>
+      <td style="text-align:right;font-family:var(--mono);font-size:14px;color:var(--orange-bright);padding:10px 8px;">${totalMonthlyStr}</td>
+      <td style="text-align:center;padding:10px 8px;">—</td>
+    </tr>
+  `;
+
+  tbody.innerHTML = html;
+
+  // Update metrics with pirate-specific data
+  document.getElementById('na-metric-nodes').innerHTML = `${totals.uniqueChannels} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">canales</span>`;
+  document.getElementById('na-metric-views').innerHTML = `${totals.totalViews.toLocaleString('en-US')} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">robadas</span>`;
+  document.getElementById('na-metric-vph').innerHTML = `${totals.totalVPH.toFixed(1)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
+  document.getElementById('na-metric-usd').innerHTML = `$${totals.totalUSD.toFixed(4)} <span style="font-size:11px;font-weight:400;color:var(--danger);font-family:var(--font);">/h robados</span>`;
+
+  const info = document.getElementById('na-nodes-info');
+  info.innerHTML = `<strong style="color:var(--danger);">${totals.totalPirates}</strong> nodos piratas en <strong style="color:var(--danger);">${totals.uniqueChannels}</strong> canales`;
+
+  document.getElementById('na-export-btn').disabled = false;
+  document.getElementById('na-select-all-btn').style.display = 'none';
+  document.getElementById('na-deselect-btn').style.display = 'none';
+  document.getElementById('na-remove-btn').style.display = 'none';
+}
+
+/* ── Métricas ── */
 function updateMetrics(nodes) {
+  // Only for node view; pirate view handles its own
+  if (naState.naView === 'pirates') return;
   let totalViews = 0;
   let totalVPH = 0;
   let totalUSD = 0;
-
   nodes.forEach(n => {
     totalViews += n.views;
     totalVPH += n.vph;
     totalUSD += n.est_usd_per_hour;
   });
-
   document.getElementById('na-metric-nodes').innerHTML = `${nodes.length} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">nodos</span>`;
   document.getElementById('na-metric-views').textContent = totalViews.toLocaleString('en-US');
   document.getElementById('na-metric-vph').innerHTML = `${totalVPH.toFixed(2)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
@@ -440,6 +642,9 @@ function showEmptyState(msg) {
   }
   updateMetrics([]);
   document.getElementById('na-export-btn').disabled = true;
+  document.getElementById('na-select-all-btn').style.display = 'none';
+  document.getElementById('na-deselect-btn').style.display = 'none';
+  document.getElementById('na-remove-btn').style.display = 'none';
 }
 
 function showNodesReady(song, isExternal = false) {
@@ -466,14 +671,13 @@ function showNodesReady(song, isExternal = false) {
 function exportNodeReport() {
   const nodes = naState.filteredNodes;
   const query = naState.searchQuery;
-  const song = naState.targetSong;
 
   if (!nodes || nodes.length === 0) return;
 
-  let totalViews = 0;
-  let totalVPH = 0;
-  let totalUSD = 0;
-  let officialCount = 0;
+  let totalViews = 0, totalVPH = 0, totalUSD = 0, officialCount = 0;
+  const pirates = nodes.filter(n => n.isPirate);
+  const pirateConsolidated = consolidatePirateChannels(nodes);
+  const pirateTotals = getPirateTotals(nodes);
 
   nodes.forEach(n => {
     totalViews += n.views;
@@ -486,24 +690,45 @@ function exportNodeReport() {
   const dateStr = now.toLocaleDateString('es-DO', { year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = now.toLocaleTimeString('es-DO', { hour: '2-digit', minute: '2-digit' });
 
+  // ── Filas de nodos ──
   let rowsHtml = '';
   nodes.forEach((n, i) => {
     const ageYears = (n.age_days / 365).toFixed(1);
     const vphColor = n.vph > 10 ? '#0284c7' : n.vph > 1 ? '#b45309' : '#6b7280';
+    const channelColor = n.isPirate ? '#dc2626' : '#0f172a';
+    const pirateTag = n.isPirate ? ' 🏴‍☠️' : '';
     rowsHtml += `
       <tr>
         <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;">${i + 1}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;"><b>${n.channel}</b></td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:${channelColor};"><b>${n.channel}${pirateTag}</b></td>
         <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;">${n.title}</td>
         <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:10px;">${n.typeLabel}</td>
         <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;">${n.views.toLocaleString('en-US')}</td>
         <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:11px;color:#6b7280;">${ageYears} años</td>
         <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:${vphColor};font-weight:600;">${n.vph.toFixed(2)}</td>
-        <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#b45309;">$${n.est_usd_per_hour.toFixed(4)}</td>
-        <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;"><a href="${n.url}" target="_blank" style="color:#0284c7;">🔗</a></td>
+        <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:${n.isPirate ? '#dc2626' : '#b45309'};">$${n.est_usd_per_hour.toFixed(4)}</td>
       </tr>
     `;
   });
+
+  // ── Filas de piratas ──
+  let pirateRowsHtml = '';
+  pirateConsolidated.forEach((ch, i) => {
+    const monthlyLoss = ch.totalUSD * 730;
+    pirateRowsHtml += `
+      <tr>
+        <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;">${i + 1}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#dc2626;"><b>🏴‍☠️ ${ch.channel}</b></td>
+        <td style="text-align:center;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-size:12px;">${ch.nodeCount}</td>
+        <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;">${ch.totalViews.toLocaleString('en-US')}</td>
+        <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#0284c7;">${ch.totalVPH.toFixed(1)}</td>
+        <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#dc2626;">$${ch.totalUSD.toFixed(4)}</td>
+        <td style="text-align:right;padding:6px 8px;border-bottom:1px solid #e2e8f0;font-family:monospace;font-size:12px;color:#b45309;">$${(monthlyLoss >= 1000 ? (monthlyLoss / 1000).toFixed(1) + 'K' : monthlyLoss.toFixed(0))}</td>
+      </tr>
+    `;
+  });
+
+  const totalMonthlyLoss = pirateTotals.totalUSD * 730;
 
   const htmlTemplate = `<!DOCTYPE html>
 <html lang="es">
@@ -513,32 +738,30 @@ function exportNodeReport() {
 <title>Informe de Auditoría de Nodos · ${query}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #f8fafc; line-height: 1.5; }
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #0f172a; margin: 0; padding: 0; background: #f8fafc; line-height: 1.5; font-size: 13px; }
   .page { max-width: 1100px; margin: 0 auto; padding: 40px 30px; }
   .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; }
   .header-left h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; text-transform: uppercase; color: #0f172a; }
   .header-left h1 span { color: #0284c7; }
   .header-left p { font-size: 12px; color: #64748b; margin-top: 4px; }
   .header-right { text-align: right; font-size: 11px; color: #64748b; line-height: 1.8; }
-  .meta-box { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #0284c7; border-radius: 0 8px 8px 0; padding: 20px 24px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+  .meta-box { background: #ffffff; border: 1px solid #e2e8f0; border-left: 4px solid #0284c7; border-radius: 0 8px 8px 0; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
   .meta-box h3 { font-size: 13px; text-transform: uppercase; color: #0f172a; margin-bottom: 12px; letter-spacing: 0.03em; }
   .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
-  .meta-grid .label { color: #64748b; }
-  .meta-grid .value { font-weight: 600; color: #0f172a; }
-  .badge-blue { color: #0284c7; font-weight: 700; }
-  .badge-amber { color: #b45309; font-weight: 700; }
-  .badge-emerald { color: #059669; font-weight: 700; }
-  table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 12px; }
-  thead th { background: #0f172a; color: #ffffff; padding: 10px 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .section-title { font-size: 15px; font-weight: 700; color: #0f172a; margin: 24px 0 12px; padding-bottom: 6px; border-bottom: 2px solid #0f172a; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+  thead th { background: #0f172a; color: #ffffff; padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
   thead th.r { text-align: right; }
   thead th.c { text-align: center; }
   tbody tr:nth-child(even) { background: #f1f5f9; }
   tbody tr:hover { background: #e2e8f0; }
   .totals-row { background: #0f172a !important; color: #ffffff; font-weight: 600; }
-  .totals-row td { padding: 10px 8px !important; border-bottom: none !important; }
   .editable-note { margin-top: 30px; padding: 16px 20px; border: 1px dashed #94a3b8; background: #fffbeb; border-radius: 6px; font-size: 12px; color: #475569; }
   .editable-note:focus { outline: 2px solid #0284c7; outline-offset: 2px; }
   .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: center; }
+  .badge-pirate { color: #dc2626; font-weight: 700; }
+  .badge-blue { color: #0284c7; font-weight: 700; }
+  .badge-amber { color: #b45309; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -556,60 +779,89 @@ function exportNodeReport() {
     </div>
   </div>
 
+  <!-- Resumen Ejecutivo -->
   <div class="meta-box">
     <h3>📋 Resumen Ejecutivo de la Auditoría</h3>
     <div class="meta-grid">
-      <div><span class="label">Obra Auditada:</span> <span class="value">${query}</span></div>
-      <div><span class="label">Nodos Consolidados:</span> <span class="badge-blue">${nodes.length} nodos</span></div>
-      <div><span class="label">Reproducciones Acumuladas:</span> <span class="badge-emerald">${totalViews.toLocaleString('en-US')} vistas</span></div>
-      <div><span class="label">Tráfico Activo (VPH Combinado):</span> <span class="badge-blue">${totalVPH.toFixed(2)} vistas/hora</span></div>
-      <div><span class="label">Rendimiento Est. por Hora:</span> <span class="badge-amber">$${totalUSD.toFixed(4)} USD/hora</span></div>
-      <div><span class="label">CPM Aplicado:</span> <span class="value">$${naState.cpm.toFixed(2)} USD</span></div>
-      <div><span class="label">Canales Oficiales Identificados:</span> <span class="value">${officialCount}</span></div>
-      <div><span class="label">Cobertura Estimada:</span> <span class="value">${(nodes.filter(n => n.vph > 0).length / nodes.length * 100).toFixed(0)}% activo</span></div>
+      <div><strong style="color:#64748b;">Obra Auditada:</strong> ${query}</div>
+      <div><strong style="color:#64748b;">Nodos Consolidados:</strong> <span class="badge-blue">${nodes.length} nodos</span></div>
+      <div><strong style="color:#64748b;">Reproducciones Acumuladas:</strong> <span style="color:#059669;font-weight:700;">${totalViews.toLocaleString('en-US')} vistas</span></div>
+      <div><strong style="color:#64748b;">Nodos Piratas Detectados:</strong> <span class="badge-pirate">${pirateTotals.totalPirates} nodos en ${pirateTotals.uniqueChannels} canales</span></div>
+      <div><strong style="color:#64748b;">VPH Combinado:</strong> <span class="badge-blue">${totalVPH.toFixed(2)} vistas/hora</span></div>
+      <div><strong style="color:#64748b;">VPH Robado por Piratas:</strong> <span class="badge-pirate">${pirateTotals.totalVPH.toFixed(1)} vistas/hora</span></div>
+      <div><strong style="color:#64748b;">Rendimiento Total Est.:</strong> <span class="badge-amber">$${totalUSD.toFixed(4)} USD/hora</span></div>
+      <div><strong style="color:#64748b;">Pérdida Mensual por Piratería:</strong> <span class="badge-pirate">$${(totalMonthlyLoss >= 1000 ? (totalMonthlyLoss / 1000).toFixed(1) + 'K' : totalMonthlyLoss.toFixed(0))}/mes</span></div>
     </div>
   </div>
 
+  <!-- Piratas -->
+  <div class="section-title">🏴‍☠️ Canales Piratas Identificados</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;text-align:center;">#</th>
+        <th style="width:200px;">Canal Pirata</th>
+        <th style="text-align:center;">Canciones</th>
+        <th style="text-align:right;">Vistas Robadas</th>
+        <th style="text-align:right;">VPH</th>
+        <th style="text-align:right;">USD/h Robado</th>
+        <th style="text-align:right;">Pérdida/mes</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${pirateRowsHtml}
+      <tr class="totals-row">
+        <td style="text-align:center;padding:8px;">—</td>
+        <td style="padding:8px;font-weight:700;">TOTAL PIRATAS</td>
+        <td style="text-align:center;padding:8px;">${pirateTotals.totalPirates}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;">${pirateTotals.totalViews.toLocaleString('en-US')}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;">${pirateTotals.totalVPH.toFixed(1)}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#dc2626;">$${pirateTotals.totalUSD.toFixed(4)}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#dc2626;">$${(totalMonthlyLoss >= 1000 ? (totalMonthlyLoss / 1000).toFixed(1) + 'K' : totalMonthlyLoss.toFixed(0))}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Nodos -->
+  <div class="section-title">📋 Matriz Completa de Nodos</div>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:32px;text-align:center;">#</th>
+        <th style="width:170px;">Canal</th>
+        <th>Título del Nodo</th>
+        <th style="text-align:center;width:50px;">Tipo</th>
+        <th style="text-align:right;width:100px;">Vistas</th>
+        <th style="text-align:right;width:70px;">Edad</th>
+        <th style="text-align:right;width:70px;">VPH</th>
+        <th style="text-align:right;width:80px;">USD/h</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+      <tr class="totals-row">
+        <td style="text-align:center;padding:8px;">—</td>
+        <td style="padding:8px;font-weight:700;" colspan="2">TOTALES CONSOLIDADOS</td>
+        <td style="text-align:center;padding:8px;">${nodes.length}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;">${totalViews.toLocaleString('en-US')}</td>
+        <td style="text-align:right;padding:8px;">—</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#0284c7;">${totalVPH.toFixed(2)}</td>
+        <td style="text-align:right;padding:8px;font-family:monospace;font-size:13px;color:#b45309;">$${totalUSD.toFixed(4)}</td>
+      </tr>
+    </tbody>
+  </table>
+
   <div class="editable-note" contenteditable="true">
-    <strong>[ZONA EDITABLE — Haga clic aquí para personalizar las observaciones del peritaje]:</strong><br>
-    El presente documento certifica la dispersión de tráfico de la obra musical indicada en redes abiertas de distribución de video.
-    Se identificaron y curaron manualmente los nodos de terceros que operan de manera independiente.
-    Este reporte sirve como base técnica para acciones legales, reclamación de regalías, o gestión de cartera de activos digitales.
+    <strong>[ZONA EDITABLE — Haga clic aquí para personalizar]:</strong><br>
+    El presente documento certifica la dispersión de tráfico de la obra musical indicada en redes abiertas.
+    Se identificaron y curaron manualmente los nodos de terceros, incluyendo <strong>${pirateTotals.uniqueChannels} canales piratas</strong> que operan sin licencia.
+    Este reporte sirve como base técnica para acciones legales, reclamación de regalías (DMCA, Content ID), y gestión de cartera de activos digitales.
     <br><br>
     <strong>Observaciones del Perito:</strong><br>
     _________________________________________________________________________________<br>
     _________________________________________________________________________________<br>
     _________________________________________________________________________________<br>
   </div>
-
-  <table>
-    <thead>
-      <tr>
-        <th style="width:32px;text-align:center;">#</th>
-        <th style="width:140px;">Canal Distribuidor</th>
-        <th>Título del Nodo</th>
-        <th style="width:60px;text-align:center;">Tipo</th>
-        <th style="width:100px;text-align:right;">Vistas Brutas</th>
-        <th style="width:80px;text-align:right;">Antigüedad</th>
-        <th style="width:80px;text-align:right;">VPH</th>
-        <th style="width:100px;text-align:right;">USD/hora</th>
-        <th style="width:40px;text-align:center;">🔗</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${rowsHtml}
-      <tr class="totals-row">
-        <td style="text-align:center;padding:10px 8px;font-weight:700;">—</td>
-        <td style="padding:10px 8px;font-weight:700;" colspan="2">TOTALES CONSOLIDADOS</td>
-        <td style="text-align:center;padding:10px 8px;">${nodes.length}</td>
-        <td style="text-align:right;padding:10px 8px;font-family:monospace;font-size:13px;">${totalViews.toLocaleString('en-US')}</td>
-        <td style="text-align:right;padding:10px 8px;">—</td>
-        <td style="text-align:right;padding:10px 8px;font-family:monospace;font-size:13px;color:#7dd3fc;">${totalVPH.toFixed(2)}</td>
-        <td style="text-align:right;padding:10px 8px;font-family:monospace;font-size:13px;color:#fbbf24;">$${totalUSD.toFixed(4)}</td>
-        <td style="text-align:center;padding:10px 8px;">—</td>
-      </tr>
-    </tbody>
-  </table>
 
   <div class="footer">
     Nuclear AIMA · Sistema de Auditoría Forense de Activos Digitales · Generado automáticamente el ${dateStr}
@@ -619,7 +871,6 @@ function exportNodeReport() {
 </body>
 </html>`;
 
-  // Descargar
   const blob = new Blob(['\uFEFF' + htmlTemplate], { type: 'text/html;charset=utf-8;' });
   const link = document.createElement('a');
   const filename = `Auditoria_Nodos_${query.replace(/[^a-z0-9]/gi, '_').toLowerCase().substring(0, 40)}.html`;
@@ -640,7 +891,6 @@ function exportNodeReport() {
    INIT
    ══════════════════════════════════════════════ */
 
-// Se llama desde navigateTo cuando se activa la sección
 window.renderNodeAuditor = renderNodeAuditor;
 window.executeNodeSearch = executeNodeSearch;
 window.toggleNodeSelection = toggleNodeSelection;
@@ -649,3 +899,4 @@ window.deselectAllNodes = deselectAllNodes;
 window.removeSelectedNodes = removeSelectedNodes;
 window.removeNode = removeNode;
 window.exportNodeReport = exportNodeReport;
+window.switchNAView = switchNAView;
