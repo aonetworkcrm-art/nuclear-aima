@@ -118,6 +118,7 @@ function navigateTo(section) {
     updateRecoveryDashboard();
     updateCatalogDashboard();
     updateShortsDashboard();
+    updateTrendingShortsDashboard();
     checkChecklistReminder();
   }
 
@@ -1963,6 +1964,268 @@ function showShortsBreakdown() {
       <br><span style="font-size:10px;">Los Shorts tienen CPM reducido (~50% del video regular) por el YouTube Shorts Fund</span>
     </div>
   `);
+}
+
+/* ══════════════════════════════════════════════
+   TRENDING SHORTS — Shorts Virales del Momento
+   Consume el endpoint /api/shorts/trending
+   ══════════════════════════════════════════════ */
+
+let _trendingShortsCache = null;
+let _trendingShortsLoading = false;
+let _trendingGenre = 'all';
+const TRENDING_GENRES = [
+  { id: 'all', label: '🔥 Todos', icon: '🔥' },
+  { id: 'latin', label: '🇵🇷 Latino', icon: '🇵🇷' },
+  { id: 'merengue', label: '🇩🇴 Merengue', icon: '🇩🇴' },
+  { id: 'bachata', label: '🎸 Bachata', icon: '🎸' },
+  { id: 'reggaeton', label: '🎧 Reggaetón', icon: '🎧' },
+  { id: 'salsa', label: '💃 Salsa', icon: '💃' },
+  { id: 'pop', label: '🌟 Pop', icon: '🌟' },
+  { id: 'hip-hop', label: '🎤 Hip-Hop', icon: '🎤' },
+];
+
+function updateTrendingShortsDashboard() {
+  _trendingShortsCache = null;
+  fetchTrendingShorts();
+}
+
+async function fetchTrendingShorts() {
+  if (_trendingShortsLoading) return;
+  _trendingShortsLoading = true;
+
+  const sourceEl = document.getElementById('dash-trending-source');
+  if (sourceEl) sourceEl.textContent = '📡 Cargando...';
+
+  try {
+    const resp = await fetch('/api/shorts/trending?max_results=20&min_views=100');
+    const data = await resp.json();
+
+    if (data && data.status === 'success') {
+      _trendingShortsCache = data;
+      renderTrendingShortsCard();
+    } else {
+      if (sourceEl) sourceEl.textContent = '⚠️ Error al cargar';
+    }
+  } catch (e) {
+    console.warn('Trending Shorts API no disponible:', e.message);
+    if (sourceEl) sourceEl.textContent = '📡 Backend no disponible';
+    // Generar datos simulados de respaldo
+    _trendingShortsCache = generateMockTrendingShorts();
+    renderTrendingShortsCard();
+  }
+  _trendingShortsLoading = false;
+}
+
+function generateMockTrendingShorts() {
+  const mockChannels = [
+    { channel: 'Dance Vibes', views: 2500000, count: 15 },
+    { channel: 'Music Trends', views: 1800000, count: 12 },
+    { channel: 'Viral Hits', views: 1200000, count: 8 },
+    { channel: 'Latino Beats', views: 900000, count: 6 },
+    { channel: 'Short King', views: 650000, count: 5 },
+    { channel: 'Reel Factory', views: 400000, count: 4 },
+    { channel: 'Merengue Dance', views: 250000, count: 3 },
+    { channel: 'Merengue Hits', views: 180000, count: 2 },
+    { channel: 'Bachata Sensation', views: 120000, count: 2 },
+  ];
+  const allShorts = [];
+  const titles = ['Bachata Challenge', 'Merengue Dance Step', 'Salsa Night Fever', 'Reggaeton Flow', 'Dance Tutorial', 'Lip Sync Battle', 'Musica Latina'];
+  mockChannels.forEach((ch, ci) => {
+    for (let i = 0; i < ch.count; i++) {
+      allShorts.push({
+        id: allShorts.length + 1,
+        title: titles[(ci + i) % titles.length] + ' #' + (i + 1),
+        channel: ch.channel,
+        views: Math.round(ch.views * (0.3 + Math.random() * 0.7)),
+        age_days: Math.round(Math.random() * 30),
+        vph: Math.round(Math.random() * 500),
+        video_id: 'mock_' + ci + '_' + i,
+        url: '#',
+        est_usd_per_hour: 0,
+        type: 'short',
+        typeLabel: 'Short',
+        isTrending: true,
+        trendingSource: 'mock'
+      });
+    }
+  });
+  allShorts.sort((a, b) => b.views - a.views);
+  return {
+    total: allShorts.length,
+    shorts: allShorts,
+    trending_source: 'mock',
+    shorts_info: {
+      totalShorts: allShorts.length,
+      totalViews: allShorts.reduce((a, s) => a + s.views, 0),
+      totalVPH: allShorts.reduce((a, s) => a + s.vph, 0),
+      uniqueChannels: mockChannels.length,
+      topChannels: mockChannels.slice(0, 5),
+      avgViewsPerShort: Math.round(allShorts.reduce((a, s) => a + s.views, 0) / allShorts.length)
+    }
+  };
+}
+
+function renderTrendingShortsCard() {
+  const data = _trendingShortsCache;
+  if (!data) return;
+
+  const countEl = document.getElementById('dash-trending-count');
+  const viewsEl = document.getElementById('dash-trending-views');
+  const sourceEl = document.getElementById('dash-trending-source');
+  const chartEl = document.getElementById('dash-trending-bar-chart');
+
+  const shorts = data.shorts || [];
+  const totalViews = data.shorts_info?.totalViews || shorts.reduce((a, s) => a + (s.views || 0), 0);
+  const uniqueChannels = data.shorts_info?.uniqueChannels || new Set(shorts.map(s => s.channel)).size;
+  const sourceLabel = data.trending_source === 'mock' ? '📡 Datos simulados' :
+                      data.trending_source === 'trending-shelf' ? '🔥 YouTube Trending' :
+                      '🔍 Búsqueda viral';
+
+  if (countEl) countEl.textContent = shorts.length.toLocaleString('en-US');
+  if (viewsEl) viewsEl.textContent = formatViewsShort(totalViews);
+  if (sourceEl) sourceEl.textContent = sourceLabel + ' · ' + uniqueChannels + ' canales';
+
+  // Mini bar chart de top channels
+  if (chartEl && shorts.length > 0) {
+    const byChannel = {};
+    shorts.forEach(s => {
+      if (!byChannel[s.channel]) byChannel[s.channel] = { views: 0 };
+      byChannel[s.channel].views += s.views || 0;
+    });
+    const channels = Object.entries(byChannel)
+      .map(([ch, v]) => ({ channel: ch, totalViews: v.views }))
+      .sort((a, b) => b.totalViews - a.totalViews)
+      .slice(0, 8);
+    const maxViews = channels[0]?.totalViews || 1;
+    chartEl.innerHTML = channels.map(ch => {
+      const h = Math.max(3, (ch.totalViews / maxViews) * 100);
+      const color = ch.totalViews > maxViews * 0.5 ? 'var(--danger)' :
+                    ch.totalViews > maxViews * 0.2 ? 'var(--warning)' : 'var(--muted2)';
+      return '<div style="flex:1;height:' + Math.round(h) + '%;background:' + color + ';border-radius:2px 2px 0 0;min-height:3px;" title="' + ch.channel + ': ' + formatViewsShort(ch.totalViews) + '"></div>';
+    }).join('');
+  }
+}
+
+
+async function fetchTrendingByGenre(genre) {
+  _trendingGenre = genre;
+  if (genre === 'all') {
+    const data = _trendingShortsCache || generateMockTrendingShorts();
+    renderTrendingModalContent(data);
+    return;
+  }
+  const body = document.getElementById("modal-body");
+  if (body) {
+    body.innerHTML = "<div style='text-align:center;padding:30px;'><div style='font-size:24px;margin-bottom:12px;'>\u23f3</div><div style='font-size:14px;color:var(--muted);'>Buscando Shorts de " + genre + "...</div></div>";
+  }
+  try {
+    const resp = await fetch("/api/shorts/trending/music?max_results=20&genre=" + encodeURIComponent(genre) + "&cpm=1.50");
+    const data = await resp.json();
+    if (data && data.status === 'success') {
+      renderTrendingModalContent(data);
+    } else {
+      const fallback = _trendingShortsCache || generateMockTrendingShorts();
+      renderTrendingModalContent(fallback);
+    }
+  } catch (e) {
+    console.warn("Error fetching genre shorts:", e.message);
+    const fallback = _trendingShortsCache || generateMockTrendingShorts();
+    renderTrendingModalContent(fallback);
+  }
+}
+
+function renderTrendingModalContent(data) {
+  if (!data || !data.shorts) return;
+  const shorts = data.shorts.slice(0, 30);
+  const totalViews = shorts.reduce((a, s) => a + (s.views || 0), 0);
+  const totalVPH = shorts.reduce((a, s) => a + (s.vph || 0), 0);
+  const genre = _trendingGenre || 'all';
+
+  const tabsHTML = TRENDING_GENRES.map(g => {
+    const activeStyle = g.id === genre
+      ? ';border-color:var(--danger);color:var(--danger);background:rgba(255,107,74,0.08);'
+      : '';
+    return '<button class="trending-genre-tab" style="font-size:10px;padding:4px 10px;border-radius:12px;border:0.5px solid var(--border);background:var(--bg2);color:var(--muted);cursor:pointer;font-family:var(--font);white-space:nowrap;transition:all 0.15s' + activeStyle + '" onclick="fetchTrendingByGenre(\'' + g.id + '\')">' + g.icon + ' ' + g.label + '</button>';
+  }).join('');
+
+  const byChannel = {};
+  shorts.forEach(s => {
+    if (!byChannel[s.channel]) byChannel[s.channel] = { channel: s.channel, totalViews: 0, count: 0 };
+    byChannel[s.channel].totalViews += s.views || 0;
+    byChannel[s.channel].count++;
+  });
+  const channelData = Object.values(byChannel).sort((a, b) => b.totalViews - a.totalViews);
+  const donutHtml = typeof renderDonutChart === 'function'
+    ? renderDonutChart(channelData, 'totalViews', 'channel', 200, 36)
+    : '';
+
+  const rowsHTML = shorts.map((s, i) => {
+    const vs = s.viralScore || Math.min(99, Math.round((s.views || 0) / 50000));
+    return '<tr>' +
+      '<td style="font-size:11px;color:var(--muted);text-align:center;padding:4px 6px;">' + (i + 1) + '</td>' +
+      '<td style="padding:4px 6px;"><div style="font-size:12px;font-weight:500;color:var(--danger);">' + (s.channel || '?') + '</div>' +
+        '<div style="font-size:10px;color:var(--muted2);">' + (s.title || '').substring(0, 40) + '</div></td>' +
+      '<td style="text-align:right;padding:4px 6px;font-family:var(--mono);font-size:12px;font-weight:600;color:' + (s.views > 1000000 ? 'var(--danger)' : 'var(--text)') + ';">' + formatViewsShort(s.views || 0) + '</td>' +
+      '<td style="text-align:right;padding:4px 6px;font-family:var(--mono);font-size:11px;color:var(--accent);">' + Math.round(s.vph || 0).toLocaleString('en-US') + '</td>' +
+      '<td style="text-align:right;padding:4px 6px;font-family:var(--mono);font-size:11px;color:' + (vs > 70 ? 'var(--danger)' : 'var(--warning)') + ';">' + vs + '/100</td>' +
+      '<td style="text-align:right;padding:4px 6px;">' +
+        '<a href="' + (s.url || '#') + '" target="_blank" onclick="event.stopPropagation()" style="color:var(--info-bright);font-size:10px;text-decoration:none;">\u25b6</a>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  const sourceLabel = data.trending_source === 'trending-shelf' ? 'YouTube Trending' :
+                      data.trending_source === 'generic-search' ? 'B\u00fasqueda viral' :
+                      data.trending_source === 'mock' ? 'Datos simulados' :
+                      genre !== 'all' ? 'Shorts de ' + genre : data.trending_source || 'API';
+  const totalEstUSD = shorts.reduce((a, s) => a + (s.est_usd_per_hour || 0), 0);
+
+  const modalBody =
+    '<div style="margin-bottom:12px;display:flex;gap:4px;flex-wrap:wrap;overflow-x:auto;padding-bottom:4px;">' + tabsHTML + '</div>' +
+    '<div style="margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6;">Shorts <strong style="color:var(--danger);">m\u00e1s virales del momento</strong> extra\u00eddos de YouTube. Fuente: <strong>' + sourceLabel + '</strong>.' +
+    (genre !== 'all' ? ' Filtro: <strong style="color:var(--danger);">' + genre + '</strong>.' : '') + '</div>' +
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">' +
+      '<div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Total Shorts</div><div style="font-size:24px;font-weight:700;color:var(--danger);">' + shorts.length.toLocaleString('en-US') + '</div><div style="font-size:10px;color:var(--muted);">virales ahora</div></div>' +
+      '<div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Vistas Combinadas</div><div style="font-size:20px;font-weight:700;color:var(--emerald);font-family:var(--mono);">' + formatViewsShort(totalViews) + '</div><div style="font-size:10px;color:var(--muted);">' + Math.round(totalVPH).toLocaleString('en-US') + ' VPH</div></div>' +
+      '<div style="background:var(--bg3);border-radius:var(--radius);padding:12px;text-align:center;"><div style="font-size:10px;color:var(--muted);text-transform:uppercase;">Canales \u00danicos</div><div style="font-size:24px;font-weight:700;color:var(--info-bright);">' + channelData.length + '</div><div style="font-size:10px;color:var(--muted);">' + (totalEstUSD > 0 ? formatMoneyCompact(totalEstUSD) + '/h' : '') + '</div></div>' +
+    '</div>' +
+    (donutHtml ? '<div style="margin-bottom:16px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px;"><div style="font-size:11px;color:var(--muted);margin-bottom:8px;font-weight:500;">\ud83d\udd25 Distribuci\u00f3n de Shorts virales por canal</div>' + donutHtml + '</div>' : '') +
+    '<h4 style="font-size:12px;color:var(--danger);margin-bottom:8px;">\ud83d\udd25 Top Shorts Virales</h4>' +
+    '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;">' +
+      '<thead><tr>' +
+        '<th style="width:30px;text-align:center;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">#</th>' +
+        '<th style="text-align:left;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">Canal</th>' +
+        '<th style="text-align:right;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">Vistas</th>' +
+        '<th style="text-align:right;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">VPH</th>' +
+        '<th style="text-align:right;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">\ud83d\udd25 Viral</th>' +
+        '<th style="width:30px;text-align:center;padding:4px 6px;background:var(--bg4);color:var(--muted);font-size:10px;">URL</th>' +
+      '</tr></thead><tbody>' + rowsHTML + '</tbody></table></div>' +
+    '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:var(--radius);font-size:11px;color:var(--muted);text-align:center;line-height:1.6;">\ud83d\udd25 <strong>Shorts virales del momento:</strong> ' + shorts.length + ' videos en ' + channelData.length + ' canales \u00b7 \ud83d\udcc8 <strong>VPH combinado:</strong> ' + Math.round(totalVPH).toLocaleString('en-US') + ' \u00b7 <strong>Fuente:</strong> ' + sourceLabel + '<br><span style="font-size:10px;">Haz clic en \u25b6 para abrir cada Short en YouTube \u00b7 Cambia de g\u00e9nero con los filtros de arriba</span></div>';
+
+  const title = genre !== 'all'
+    ? genre.charAt(0).toUpperCase() + genre.slice(1) + ' \u00b7 Shorts Virales'
+    : '\ud83d\udd25 YouTube Shorts Virales \u00b7 Momento Actual';
+  const modalEl = document.getElementById("modal-title");
+  if (modalEl) modalEl.textContent = title;
+  const body = document.getElementById("modal-body");
+  if (body) body.innerHTML = modalBody;
+}
+
+function showTrendingShortsBreakdown() {
+  if (_trendingShortsLoading) {
+    openModal('\ud83d\udd25 YouTube Shorts Virales',
+      '<div style="text-align:center;padding:30px;">' +
+        '<div style="font-size:24px;margin-bottom:12px;">\u23f3</div>' +
+        '<div style="font-size:14px;color:var(--muted);">Cargando Shorts virales...</div>' +
+        '<div style="font-size:11px;color:var(--muted2);margin-top:8px;">Espera unos segundos y vuelve a hacer clic</div>' +
+      '</div>'
+    );
+    return;
+  }
+  _trendingGenre = 'all';
+  const data = _trendingShortsCache || generateMockTrendingShorts();
+  renderTrendingModalContent(data);
 }
 
 /* ── Init ── */

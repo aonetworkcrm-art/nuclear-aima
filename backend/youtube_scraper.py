@@ -157,24 +157,54 @@ class YouTubeScraper:
     #  que parsear el DOM renderizado.
     # ─────────────────────────────────────────────
 
-    def _extract_yt_initial_data(self):
+    def _extract_yt_initial_data(self, timeout=10, poll_interval=0.5):
         """Extrae el objeto ytInitialData del DOM vía JavaScript.
-        Este objeto JSON contiene TODOS los resultados de búsqueda
-        con metadatos precisos, incluyendo Shorts.
+        Usa XPath para encontrar el script tag que contiene ytInitialData,
+        mucho más confiable que el querySelector con :contains() (XPath puro).
+        
+        Incluye reintentos automáticos con timeout configurable para
+        manejar páginas que tardan en cargar.
+        
+        Args:
+            timeout: Tiempo máximo en segundos para esperar (default: 10)
+            poll_interval: Intervalo entre reintentos en segundos (default: 0.5)
+        
         Returns:
             dict or None
         """
-        try:
-            data = self.driver.execute_script(
-                'return window.ytInitialData || '
-                'document.querySelector(\'script[contains(text(),"ytInitialData")]\') ? '
-                'JSON.parse(document.querySelector(\'script[contains(text(),"ytInitialData")]\') '
-                '.textContent.replace("window.ytInitialData = ","").slice(0,-1)) : null'
-            )
-            return data
-        except Exception as e:
-            print(f"[YouTubeScraper] Error extrayendo ytInitialData: {e}")
-            return None
+        max_attempts = max(1, int(timeout / poll_interval))
+        
+        for attempt in range(1, max_attempts + 1):
+            try:
+                data = self.driver.execute_script(
+                    'try {'
+                    '  if (window.ytInitialData) return window.ytInitialData;'
+                    '  var xpathResult = document.evaluate(\'//script[contains(text(),"ytInitialData")]\', '
+                    '    document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);'
+                    '  var scriptTag = xpathResult.singleNodeValue;'
+                    '  if (!scriptTag) return null;'
+                    '  var raw = scriptTag.textContent || scriptTag.innerText || \'\';'
+                    '  var cleaned = raw.replace(\'window.ytInitialData = \', \'\').trim();'
+                    '  if (cleaned.charAt(cleaned.length - 1) === \';\') cleaned = cleaned.slice(0, -1);'
+                    '  return JSON.parse(cleaned);'
+                    '} catch(e) { return null; }'
+                )
+                
+                if data is not None:
+                    if attempt > 1:
+                        print(f"[YouTubeScraper] ytInitialData obtenido en intento #{attempt}")
+                    return data
+                    
+            except Exception as e:
+                if attempt == max_attempts:
+                    print(f"[YouTubeScraper] Error en intento #{attempt}: {e}")
+                    return None
+            
+            if attempt < max_attempts:
+                time.sleep(poll_interval)
+        
+        print(f"[YouTubeScraper] No se pudo extraer ytInitialData tras {max_attempts} intentos")
+        return None
 
     def _extract_shorts_from_initial_data(self, data, query, max_results=30):
         """
