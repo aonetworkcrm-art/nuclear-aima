@@ -1776,6 +1776,8 @@ function renderMultiArtist() {
 let _dashboardShortsCache = null;
 
 function updateShortsDashboard() {
+  // Si hay datos reales del API, intentar cargarlos
+  _dashboardShortsCache = null;
   generateAggregatedShortsData();
   renderShortsCard();
 }

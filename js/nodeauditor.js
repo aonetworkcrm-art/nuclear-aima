@@ -33,7 +33,13 @@ let naState = {
   apiBaseUrl: 'http://localhost:5000',
   // Shorts data
   shorts: [],
-  shortsFiltered: []
+  shortsFiltered: [],
+  // Shorts filter/sort state
+  shortsSearch: '',
+  shortsSortBy: 'views',
+  shortsChannelFilter: 'all',
+  shortsPage: 1,
+  shortsPerPage: 25
 };
 
 /* ── Referencias globales (se resuelven al usar) ── */
@@ -625,11 +631,22 @@ function updateSelectionUI() {
 /* ── Cambiar vista ── */
 function switchNAView(view) {
   naState.naView = view;
+  naState.shortsSearch = '';
+  naState.shortsSortBy = 'views';
+  naState.shortsChannelFilter = 'all';
+  naState.shortsPage = 1;
+  // Resetear shortsFiltered al entrar a la vista de Shorts
+  if (view === 'shorts') {
+    naState.shortsFiltered = [...naState.shorts];
+  }
   renderResults();
   // Update tab UI
   document.querySelectorAll('.na-view-tab').forEach(t => {
     t.classList.toggle('active', t.dataset.view === view);
   });
+  // Show/hide shorts filter bar
+  const filterBar = document.getElementById('na-shorts-filter-bar');
+  if (filterBar) filterBar.style.display = (view === 'shorts') ? 'flex' : 'none';
 }
 
 /* ══════════════════════════════════════════════
@@ -703,8 +720,7 @@ function renderNodeAuditor() {
     </div>
 
     <!-- Tabla de nodos -->
-    <div class="na-table-wrapper">
-      <div class="na-table-toolbar">
+    <div class="na-table-wrapper">        <div class="na-table-toolbar">
         <div class="na-table-toolbar-left">
           <!-- View Tabs -->
           <div class="na-view-tabs">
@@ -728,6 +744,27 @@ function renderNodeAuditor() {
           <button class="btn btn-xs" onclick="exportNodeReport()" id="na-export-btn" disabled style="font-size:10px;background:var(--accent);color:#0d0d0f;">📥 HTML</button>
           <button class="btn btn-xs btn-ghost" onclick="exportNodePDF()" id="na-export-pdf-btn" disabled style="font-size:10px;">📄 PDF</button>
         </div>
+      </div>
+      <!-- Shorts Filter Bar (hidden by default) -->
+      <div id="na-shorts-filter-bar" style="display:none;padding:8px 16px;border-bottom:0.5px solid var(--border);background:var(--bg3);align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="na-shorts-search" placeholder="🔍 Buscar Shorts por título o canal..."
+          style="flex:1;min-width:120px;padding:6px 10px;background:var(--bg4);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;"
+          oninput="naState.shortsSearch=this.value;filterShorts()" />
+        <select id="na-shorts-sort" style="padding:6px 10px;background:var(--bg4);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;cursor:pointer;"
+          onchange="applyShortsSort(this.value)">
+          <option value="views">👁️ Por vistas</option>
+          <option value="vph">📈 Por VPH</option>
+          <option value="vpd">📅 Por vistas/día</option>
+          <option value="viral">🔥 Por viral score</option>
+          <option value="date">🕐 Más recientes</option>
+        </select>
+        <select id="na-shorts-channel-filter" style="padding:6px 10px;background:var(--bg4);border:0.5px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;cursor:pointer;max-width:160px;"
+          onchange="applyShortsChannelFilter(this.value)">
+          <option value="all">📱 Todos los canales</option>
+        </select>
+        <button class="btn btn-xs btn-ghost" onclick="shortsPrevPage()" style="font-size:10px;" id="na-shorts-prev">◀</button>
+        <span id="na-shorts-page-info" style="font-size:10px;color:var(--muted2);white-space:nowrap;">—</span>
+        <button class="btn btn-xs btn-ghost" onclick="shortsNextPage()" style="font-size:10px;" id="na-shorts-next">▶</button>
       </div>
       <div class="na-table-scroll">
         <div id="na-table-container">
@@ -1049,6 +1086,76 @@ function renderPirateView() {
   document.getElementById('na-remove-btn').style.display = 'none';
 }
 
+/* ── Filtros de Shorts ── */
+function filterShorts() {
+  const search = naState.shortsSearch.toLowerCase().trim();
+  const sortBy = naState.shortsSortBy;
+  const channelFilter = naState.shortsChannelFilter;
+  
+  let filtered = [...naState.shorts];
+  
+  // Búsqueda por título
+  if (search) {
+    filtered = filtered.filter(s => 
+      s.title.toLowerCase().includes(search) || 
+      s.channel.toLowerCase().includes(search)
+    );
+  }
+  
+  // Filtro por canal
+  if (channelFilter !== 'all') {
+    filtered = filtered.filter(s => s.channel === channelFilter);
+  }
+  
+  // Ordenamiento
+  if (sortBy === 'views') {
+    filtered.sort((a, b) => b.views - a.views);
+  } else if (sortBy === 'vph') {
+    filtered.sort((a, b) => b.vph - a.vph);
+  } else if (sortBy === 'date') {
+    filtered.sort((a, b) => a.age_days - b.age_days);
+  } else if (sortBy === 'viral') {
+    filtered.sort((a, b) => (b.viralScore || 0) - (a.viralScore || 0));
+  } else if (sortBy === 'vpd') {
+    filtered.sort((a, b) => (b.estViewsPerDay || 0) - (a.estViewsPerDay || 0));
+  }
+  
+  naState.shortsFiltered = filtered;
+  naState.shortsPage = 1;
+  renderShortsView();
+}
+
+function applyShortsSort(sortBy) {
+  naState.shortsSortBy = sortBy;
+  filterShorts();
+  document.querySelectorAll('.na-sort-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.sort === sortBy);
+  });
+}
+
+function applyShortsChannelFilter(channel) {
+  naState.shortsChannelFilter = channel;
+  filterShorts();
+  document.querySelectorAll('.na-channel-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.channel === channel);
+  });
+}
+
+function shortsPrevPage() {
+  if (naState.shortsPage > 1) {
+    naState.shortsPage--;
+    renderShortsView();
+  }
+}
+
+function shortsNextPage() {
+  const maxPage = Math.ceil(naState.shortsFiltered.length / naState.shortsPerPage);
+  if (naState.shortsPage < maxPage) {
+    naState.shortsPage++;
+    renderShortsView();
+  }
+}
+
 /* ══════════════════════════════════════════════
    VISTA DE SHORTS VIRALES
    ══════════════════════════════════════════════ */
@@ -1087,6 +1194,34 @@ function renderShortsView() {
     return;
   }
 
+  // ── Filter Bar visible ──
+  const filterBar = document.getElementById('na-shorts-filter-bar');
+  if (filterBar) filterBar.style.display = 'flex';
+  
+  // ── Poblar dropdown de canales ──
+  const channelSelect = document.getElementById('na-shorts-channel-filter');
+  if (channelSelect && channelSelect.options.length <= 1) {
+    const channels = [...new Set(shorts.map(s => s.channel))].sort();
+    channels.forEach(ch => {
+      const opt = document.createElement('option');
+      opt.value = ch;
+      opt.textContent = `📱 ${ch.substring(0, 30)}`;
+      channelSelect.appendChild(opt);
+    });
+  }
+  
+  // ── Actualizar paginación ──
+  const pageInfo = document.getElementById('na-shorts-page-info');
+  if (pageInfo) {
+    pageInfo.textContent = `${naState.shortsPage}/${maxPage}`;
+  }
+
+  // ── Paginación ──
+  const startIdx = (naState.shortsPage - 1) * naState.shortsPerPage;
+  const endIdx = Math.min(startIdx + naState.shortsPerPage, shorts.length);
+  const pageShorts = shorts.slice(startIdx, endIdx);
+  const maxPage = Math.ceil(shorts.length / naState.shortsPerPage);
+
   // ── Top Bar Chart ──
   const maxViews = consolidated.length > 0 ? consolidated[0].totalViews : 1;
   let html = '';
@@ -1112,8 +1247,8 @@ function renderShortsView() {
     <div style="font-size:9px;color:var(--muted2);margin-top:4px;">Top canales por vistas de Shorts</div>
   </div></td></tr>`;
 
-  // Tabla de Shorts individuales
-  shorts.forEach((s, i) => {
+  // Tabla de Shorts individuales (paginada)
+  pageShorts.forEach((s, i) => {
     const ageStr = s.age_days < 30 ? Math.round(s.age_days) + ' días'
       : Math.round(s.age_days / 30) + ' meses';
 
@@ -1127,7 +1262,7 @@ function renderShortsView() {
 
     html += `
       <tr class="na-node-row" style="background:rgba(92,140,224,0.02);">
-        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">${i + 1}</td>
+        <td style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;">${startIdx + i + 1}</td>
         <td>
           <div style="font-size:12px;font-weight:500;color:var(--info-bright);">📱 ${s.channel}</div>
           <div style="font-size:10px;color:var(--muted2);margin-top:1px;">${viralBadge}</div>
@@ -1165,6 +1300,15 @@ function renderShortsView() {
 
   tbody.innerHTML = html;
   updateShortsMetrics(shorts);
+
+  // Update info bar
+  const info = document.getElementById('na-nodes-info');
+  info.innerHTML = `<strong style="color:var(--info-bright);">${shorts.length}</strong> Shorts · <strong>${totals.uniqueChannels}</strong> canales · Mostrando ${startIdx + 1}-${endIdx}`;
+  
+  // Pagination controls
+  if (maxPage > 1) {
+    info.innerHTML += ` · <span style="color:var(--muted2);">Pág ${naState.shortsPage}/${maxPage}</span>`;
+  }
 
   document.getElementById('na-export-btn').disabled = false;
   document.getElementById('na-select-all-btn').style.display = 'none';
@@ -1646,3 +1790,9 @@ window.switchNAView = switchNAView;
 window.auditSingleSong = auditSingleSong;
 window.auditAllArtistSongs = auditAllArtistSongs;
 window.renderShortsView = renderShortsView;
+window.filterShorts = filterShorts;
+window.applyShortsSort = applyShortsSort;
+window.applyShortsChannelFilter = applyShortsChannelFilter;
+window.shortsPrevPage = shortsPrevPage;
+window.shortsNextPage = shortsNextPage;
+window.generateShortsForSong = generateShortsForSong;
