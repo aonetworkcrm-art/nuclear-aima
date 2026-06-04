@@ -443,6 +443,132 @@ class YouTubeScraper:
             return None
 
     # ─────────────────────────────────────────────
+    #  SHORTS CON ESTE AUDIO (ytInitialData en /watch)
+    #  Extrae los Shorts que usan la misma pista de audio
+    #  que un video específico. Aparecen como un shelf
+    #  "Shorts con este audio" / "Shorts with this audio"
+    #  dentro de la página del video.
+    # ─────────────────────────────────────────────
+
+    def get_shorts_with_this_audio(self, video_url, max_results=50):
+        """
+        Extrae los Shorts que usan la misma pista de audio que
+        un video específico de YouTube.
+
+        Estos aparecen en la sección "Shorts con este audio"
+        dentro de la página /watch del video. YouTube los genera
+        automáticamente detectando coincidencias de audio.
+
+        Args:
+            video_url: URL completa del video de YouTube
+                       (ej. "https://www.youtube.com/watch?v=VIDEO_ID")
+            max_results: Máximo de Shorts a extraer (default: 50)
+
+        Returns:
+            Lista de diccionarios con datos de cada Short
+        """
+        if not self.driver:
+            self._init_driver()
+
+        shorts = []
+        seen_ids = set()
+
+        try:
+            print(f"[YouTubeScraper] Buscando Shorts con este audio: {video_url}")
+            self.driver.get(video_url)
+
+            # Esperar a que cargue la página del video
+            WebDriverWait(self.driver, self.timeout).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, '#movie_player, ytd-watch-flexy, #contents'))
+            )
+            time.sleep(3)  # dejar que JS termine de renderizar los shelves
+
+            # Extraer ytInitialData
+            initial_data = self._extract_yt_initial_data()
+            if not initial_data:
+                print("[YouTubeScraper] No se pudo extraer ytInitialData del video")
+                return shorts
+
+            # Navegar por la estructura de la página del video
+            try:
+                contents = (initial_data.get('contents', {})
+                            .get('twoColumnWatchNextResults', {})
+                            .get('results', {})
+                            .get('results', {})
+                            .get('contents', []))
+            except AttributeError:
+                print("[YouTubeScraper] Estructura de contenido no encontrada en /watch")
+                return shorts
+
+            # Buscar reelShelfRenderer en los contents
+            # Puede estar anidado dentro de itemSectionRenderer
+            for content_item in contents:
+                if len(shorts) >= max_results:
+                    break
+
+                # Buscar reelShelfRenderer directo
+                reel_shelf = content_item.get('reelShelfRenderer', None)
+
+                # O buscar dentro de itemSectionRenderer
+                if not reel_shelf:
+                    item_section = content_item.get('itemSectionRenderer', {})
+                    for sub_item in item_section.get('contents', []):
+                        reel_shelf = sub_item.get('reelShelfRenderer', None)
+                        if reel_shelf:
+                            break
+
+                if not reel_shelf:
+                    continue
+
+                # Verificar que el título del shelf mencione "shorts" y "audio"/"song"
+                title_runs = reel_shelf.get('title', {}).get('runs', [])
+                shelf_title = ' '.join(r.get('text', '') for r in title_runs).lower()
+
+                # Buscar shelves que contengan shorts con audio
+                # Títulos comunes: "Shorts with this audio", "Shorts con este audio",
+                # "Shorts with this sound", "Use this sound", "Remixes"
+                is_audio_shelf = any(kw in shelf_title for kw in [
+                    'shorts', 'audio', 'sound', 'remix', 'song', 'canción',
+                    'este audio', 'this audio', 'this sound', 'este sonido'
+                ])
+
+                if not is_audio_shelf:
+                    # Si el título no tiene palabras clave pero es un reel shelf,
+                    # igual lo procesamos (puede ser el único shelf de shorts)
+                    has_short_title = any(kw in shelf_title for kw in ['short'])
+                    if not has_short_title:
+                        continue
+
+                print(f"[YouTubeScraper] Encontrado shelf: '{shelf_title}'")
+
+                # Parsear items del shelf
+                items = reel_shelf.get('items', [])
+                for item in items:
+                    if len(shorts) >= max_results:
+                        break
+
+                    short = self._parse_reel_item(item, shelf_title)
+                    if short and short['video_id'] not in seen_ids:
+                        seen_ids.add(short['video_id'])
+                        short['id'] = len(shorts) + 1
+                        short['source'] = 'audio-shelf'
+                        short['audioSource'] = video_url
+                        shorts.append(short)
+
+                print(f"[YouTubeScraper] Extraídos {len(shorts)} Shorts del shelf de audio")
+
+            print(f"[YouTubeScraper] Total Shorts con este audio: {len(shorts)}")
+
+        except TimeoutException:
+            print("[YouTubeScraper] Timeout cargando página del video")
+        except Exception as e:
+            print(f"[YouTubeScraper] Error: {e}")
+            import traceback
+            traceback.print_exc()
+
+        return shorts
+
+    # ─────────────────────────────────────────────
     #  BÚSQUEDA DE SHORTS (navegación + JSON)
     # ─────────────────────────────────────────────
 
@@ -1028,24 +1154,88 @@ class YouTubeScraper:
             'avgViewsPerShort': total_views // len(shorts) if shorts else 0
         }
 
-    def search_song_with_shorts(self, query, max_nodes=50, max_shorts=20):
+    def search_song_with_shorts(self, query, max_nodes=50, max_shorts=20,
+                                   include_audio_shorts=True):
         """
-        Búsqueda completa: nodos regulares + Shorts en una sola llamada.
-        
+        Búsqueda completa: nodos regulares + Shorts (por palabra clave y
+        por audio) en una sola llamada.
+
+        Estrategias:
+        1. Búsqueda normal de nodos (videos)
+        2. Shorts por palabra clave (#shorts + query)
+        3. Shorts con este audio (desde la página del video oficial)
+           — extrae los Shorts que usan la misma pista de audio
+
         Args:
             query: Término de búsqueda
             max_nodes: Máximo de nodos regulares
             max_shorts: Máximo de Shorts
-            
+            include_audio_shorts: Si incluye Shorts con este audio (default: True)
+
         Returns:
-            Dict con 'nodes' y 'shorts'
+            Dict con 'nodes', 'shorts', y 'audio_shorts'
         """
         nodes = self.search_song(query, max_results=max_nodes)
         shorts = self.search_shorts(query, max_results=max_shorts)
-        
+        audio_shorts = []
+
+        if include_audio_shorts and nodes:
+            # Tomar el primer nodo oficial (o el de más vistas) como referencia
+            # para extraer Shorts con este audio
+            candidates = sorted(
+                [n for n in nodes if n.get('url')],
+                key=lambda n: (
+                    2 if n.get('isOfficial') else 1,
+                    n.get('views', 0)
+                ),
+                reverse=True
+            )
+
+            # Intentar con los 3 mejores candidatos
+            for candidate in candidates[:3]:
+                video_url = candidate.get('url', '')
+                if not video_url or 'youtube.com' not in video_url:
+                    continue
+
+                try:
+                    print(f"[Scraper] Extrayendo Shorts con este audio desde: {video_url}")
+                    audio_shorts_partial = self.get_shorts_with_this_audio(
+                        video_url, max_results=max_shorts
+                    )
+                    for s in audio_shorts_partial:
+                        s['songName'] = query
+                    audio_shorts.extend(audio_shorts_partial)
+
+                    # Si ya tenemos suficientes, paramos
+                    if len(audio_shorts) >= max_shorts:
+                        break
+                except Exception as e:
+                    print(f"[Scraper] Error extrayendo audio shorts de {video_url}: {e}")
+                    continue
+
+            # Eliminar duplicados por video_id (incluyendo dentro de audio_shorts)
+            seen_ids = set(s.get('video_id', '') for s in shorts if s.get('video_id'))
+            unique_audio = []
+            for s in audio_shorts:
+                vid = s.get('video_id', '')
+                if vid and vid not in seen_ids:
+                    seen_ids.add(vid)
+                    unique_audio.append(s)
+            audio_shorts = unique_audio
+
+            print(f"[Scraper] Shorts con este audio: {len(audio_shorts)}")
+
+        # Consolidar todos los shorts
+        all_shorts = shorts + audio_shorts
+
+        # Reasignar IDs
+        for i, s in enumerate(all_shorts):
+            s['id'] = i + 1
+
         return {
             'nodes': nodes,
-            'shorts': shorts
+            'shorts': all_shorts,
+            'audio_shorts': audio_shorts
         }
 
     def close(self):
@@ -1060,18 +1250,54 @@ class YouTubeScraper:
 
 # ── Uso directo ──
 if __name__ == '__main__':
+    import sys
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'shorts'
+    query = sys.argv[2] if len(sys.argv) > 2 else 'Ramón Orlando - Te Compro Tu Novia'
+    
     scraper = YouTubeScraper(headless=True)
     try:
-        import sys
-        query = sys.argv[1] if len(sys.argv) > 1 else 'Ramón Orlando - Te Compro Tu Novia'
+        if mode == 'shorts':
+            # Modo 1: Shorts por palabra clave
+            print(f"═ Shorts por búsqueda: {query} ═")
+            shorts = scraper.search_shorts(query, max_results=15)
+            info = scraper.get_shorts_info(shorts)
+            print(json.dumps({'shorts': shorts, 'info': info}, indent=2, ensure_ascii=False))
         
-        # Shorts test
-        shorts = scraper.search_shorts(query, max_results=15)
-        info = scraper.get_shorts_info(shorts)
-        print(json.dumps({'shorts': shorts, 'info': info}, indent=2, ensure_ascii=False))
+        elif mode == 'audio':
+            # Modo 2: Shorts con este audio
+            video_id = sys.argv[3] if len(sys.argv) > 3 else ''
+            if not video_id:
+                # Buscar el video primero
+                print(f"═ Buscando nodos para: {query} ═")
+                nodes = scraper.search_song(query, max_results=5)
+                if nodes:
+                    best = max(nodes, key=lambda n: (2 if n.get('isOfficial') else 1, n.get('views', 0)))
+                    video_id = best.get('url', '').split('=')[-1].split('&')[0]
+                    print(f"Mejor candidato: {best.get('title')} -> {video_id}")
+            
+            if video_id:
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                shorts = scraper.get_shorts_with_this_audio(url, max_results=30)
+                info = scraper.get_shorts_info(shorts)
+                print(json.dumps({'video_id': video_id, 'shorts': shorts, 'info': info},
+                                 indent=2, ensure_ascii=False))
+            else:
+                print("No se encontraron videos para la consulta")
         
-        # Full test
-        # result = scraper.search_song_with_shorts(query, max_nodes=20, max_shorts=10)
-        # print(json.dumps(result, indent=2, ensure_ascii=False))
+        elif mode == 'full':
+            # Modo 3: Completo (nodos + shorts + audio)
+            print(f"═ Búsqueda completa: {query} ═")
+            result = scraper.search_song_with_shorts(query, max_nodes=10, max_shorts=15)
+            print(json.dumps({
+                'query': query,
+                'nodes': len(result['nodes']),
+                'shorts': len(result['shorts']),
+                'audio_shorts': len(result['audio_shorts']),
+                'song_info': scraper.get_song_info(result['nodes']),
+                'shorts_info': scraper.get_shorts_info(result['shorts'])
+            }, indent=2, ensure_ascii=False))
+        else:
+            print(f"Modos disponibles: shorts, audio, full")
+            print(f"Ejemplo: python youtube_scraper.py full \"Te Compro Tu Novia\"")
     finally:
         scraper.close()
