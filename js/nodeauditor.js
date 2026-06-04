@@ -1101,7 +1101,7 @@ function renderNodeView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${n.vph.toFixed(2)}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:${n.isPirate ? 'var(--danger)' : 'var(--orange-bright)'};">$${n.est_usd_per_hour.toFixed(4)}</td>
         <td style="text-align:center;">
-          <a href="${n.url}" target="_blank" class="na-node-link" title="Buscar video en YouTube">🔍</a>
+          ${getYouTubeLinkHtml(n.url)}
           <button class="na-node-remove" onclick="removeNode(${n.id})" title="Eliminar nodo">✕</button>
         </td>
       </tr>
@@ -1492,7 +1492,7 @@ function renderShortsView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);">${(s.estViewsPerDay || 0).toLocaleString()}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${s.est_usd_per_hour.toFixed(6)}</td>
         <td style="text-align:center;">
-          <a href="${s.url}" target="_blank" class="na-node-link" title="Buscar Short en YouTube" onclick="event.stopPropagation()">🔍</a>
+          ${getYouTubeLinkHtml(s.url, 'onclick="event.stopPropagation()"')}
         </td>
       </tr>
     `;
@@ -1683,7 +1683,7 @@ function renderAudioShortsView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${s.vph.toFixed(2)}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${(s.est_usd_per_hour || 0).toFixed(6)}</td>
         <td style="text-align:center;">
-          <a href="${s.url}" target="_blank" class="na-node-link" title="Buscar Short en YouTube">🔍</a>
+          ${getYouTubeLinkHtml(s.url)}
         </td>
       </tr>
     `;
@@ -1821,7 +1821,7 @@ function showShortDetail(short) {
   
   const footerHTML = `
     <button class="btn btn-sm btn-ghost" onclick="closeModal()">Cerrar</button>
-    <a href="${short.url}" target="_blank" class="btn btn-sm" style="background:var(--info-bright);color:#0d0d0f;border:none;text-decoration:none;">🔍 Buscar en YouTube</a>
+    <a href="${short.url}" target="_blank" class="btn btn-sm" style="background:var(--info-bright);color:#0d0d0f;border:none;text-decoration:none;">${isDirectVideoUrl(short.url) ? '🔗' : '🔍'} ${isDirectVideoUrl(short.url) ? 'Ver en YouTube' : 'Buscar en YouTube'}</a>
     <button class="btn btn-sm btn-ghost" onclick="closeModal();showShortsBreakdown()" style="display:${naState.naView === 'shorts' ? 'none' : 'inline-flex'};">📊 Ver todos los Shorts</button>
   `;
   
@@ -1976,6 +1976,22 @@ function updateShortsMetrics(shorts) {
   document.getElementById('na-metric-views').innerHTML = `${totals.totalViews.toLocaleString('en-US')} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">virales</span>`;
   document.getElementById('na-metric-vph').innerHTML = `${totals.totalVPH.toFixed(1)} <span style="font-size:11px;font-weight:400;color:var(--muted);font-family:var(--font);">v/h</span>`;
   document.getElementById('na-metric-usd').innerHTML = `$${totals.totalUSD.toFixed(6)} <span style="font-size:11px;font-weight:400;color:var(--info-bright);font-family:var(--font);">/h shorts</span>`;
+}
+
+/* ══════════════════════════════════════════════
+   FUNCIÓN HELPER PARA LINKS DE YOUTUBE
+   ══════════════════════════════════════════════ */
+
+function isDirectVideoUrl(url) {
+  return url && (url.includes('watch?v=') || url.includes('/shorts/'));
+}
+
+function getYouTubeLinkHtml(url, extraAttrs = '') {
+  const isDirect = isDirectVideoUrl(url);
+  const icon = isDirect ? '🔗' : '🔍';
+  const tooltip = isDirect ? 'Ver video en YouTube' : 'Buscar en YouTube';
+  const extras = extraAttrs ? ' ' + extraAttrs : '';
+  return `<a href="${url}" target="_blank" class="na-node-link" title="${tooltip}"${extras}>${icon}</a>`;
 }
 
 /* ── Estados ── */
