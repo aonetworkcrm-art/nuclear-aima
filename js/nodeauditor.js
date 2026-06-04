@@ -973,7 +973,7 @@ function executeNodeSearch() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query, max_nodes: parseInt(maxNodes), cpm: parseFloat(cpm), include_shorts: true }),
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(90000)
     })
       .then(r => r.json())
       .then(data => {
