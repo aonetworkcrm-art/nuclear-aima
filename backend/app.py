@@ -7,7 +7,7 @@ Incluye detección de Nodos, Piratas y Shorts
 import os
 import json
 import logging
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from youtube_scraper import YouTubeScraper
 
@@ -17,6 +17,22 @@ CORS(app)  # Permitir conexiones desde el frontend
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('nucleus-api')
+
+# ── Frontend (archivos estáticos) para desarrollo local ──
+# En produccion, Netlify sirve el frontend y proxy /api/* a Render.
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+@app.route('/')
+def serve_index():
+    return send_from_directory(PROJECT_ROOT, 'index.html')
+
+@app.route('/js/<path:filename>')
+def serve_js(filename):
+    return send_from_directory(os.path.join(PROJECT_ROOT, 'js'), filename)
+
+@app.route('/css/<path:filename>')
+def serve_css(filename):
+    return send_from_directory(os.path.join(PROJECT_ROOT, 'css'), filename)
 
 # ── Endpoints ──
 

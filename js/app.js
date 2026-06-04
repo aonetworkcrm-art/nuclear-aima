@@ -1981,6 +1981,7 @@ let _trendingShortsLoading = false;
 let _trendingGenre = 'all';
 let _trendingLastUpdate = 0;
 let _reloadingButton = false;
+let _trendingTimerInterval = null;
 
 function formatTrendingTimestamp(ts) {
   if (!ts) return '';
@@ -1992,6 +1993,24 @@ function formatTrendingTimestamp(ts) {
   var hrs = Math.floor(mins / 60);
   return '\uD83D\uDD50 Hace ' + hrs + 'h ' + (mins % 60) + 'min';
 }
+
+function startTrendingTimer() {
+  stopTrendingTimer();
+  _trendingTimerInterval = setInterval(function() {
+    var tsEl = document.getElementById('dash-trending-timestamp');
+    if (tsEl && _trendingLastUpdate > 0) {
+      tsEl.textContent = formatTrendingTimestamp(_trendingLastUpdate);
+    }
+  }, 10000);  // cada 10 segundos
+}
+
+function stopTrendingTimer() {
+  if (_trendingTimerInterval) {
+    clearInterval(_trendingTimerInterval);
+    _trendingTimerInterval = null;
+  }
+}
+
 const TRENDING_GENRES = [
   { id: 'all', label: '🔥 Todos', icon: '🔥' },
   { id: 'latin', label: '🇵🇷 Latino', icon: '🇵🇷' },
@@ -2005,6 +2024,7 @@ const TRENDING_GENRES = [
 
 function reloadTrendingShorts() {
   if (_trendingShortsLoading) return;
+  stopTrendingTimer();
   var btn = document.getElementById('trending-reload-btn');
   if (btn) { btn.textContent = '\u23f3'; btn.style.color = 'var(--accent)'; }
   _trendingShortsCache = null;
@@ -2023,6 +2043,7 @@ async function fetchTrendingShorts() {
   if (_trendingShortsLoading) return;
   _trendingShortsLoading = true;
 
+  stopTrendingTimer();
   const sourceEl = document.getElementById('dash-trending-source');
   if (sourceEl) sourceEl.textContent = '📡 Cargando...';
 
@@ -2034,6 +2055,7 @@ async function fetchTrendingShorts() {
       _trendingShortsCache = data;
       _trendingLastUpdate = Date.now();
       renderTrendingShortsCard();
+      startTrendingTimer();
     } else {
       if (sourceEl) sourceEl.textContent = '⚠️ Error al cargar';
     }
