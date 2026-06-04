@@ -1971,9 +1971,27 @@ function showShortsBreakdown() {
    Consume el endpoint /api/shorts/trending
    ══════════════════════════════════════════════ */
 
+// URL base de la API. En Netlify (produccion) se usa proxy,
+// en desarrollo local se puede sobreescribir via window.API_BASE
+// Ejemplo: window.API_BASE = 'http://localhost:5000';
+let API_BASE = window.API_BASE || '';
+
 let _trendingShortsCache = null;
 let _trendingShortsLoading = false;
 let _trendingGenre = 'all';
+let _trendingLastUpdate = 0;
+let _reloadingButton = false;
+
+function formatTrendingTimestamp(ts) {
+  if (!ts) return '';
+  var elapsed = Math.floor((Date.now() - ts) / 1000);
+  if (elapsed < 5) return '\uD83D\uDD50 Ahora';
+  if (elapsed < 60) return '\uD83D\uDD50 Hace ' + elapsed + ' seg';
+  var mins = Math.floor(elapsed / 60);
+  if (mins < 60) return '\uD83D\uDD50 Hace ' + mins + ' min';
+  var hrs = Math.floor(mins / 60);
+  return '\uD83D\uDD50 Hace ' + hrs + 'h ' + (mins % 60) + 'min';
+}
 const TRENDING_GENRES = [
   { id: 'all', label: '🔥 Todos', icon: '🔥' },
   { id: 'latin', label: '🇵🇷 Latino', icon: '🇵🇷' },
@@ -1991,10 +2009,9 @@ function reloadTrendingShorts() {
   if (btn) { btn.textContent = '\u23f3'; btn.style.color = 'var(--accent)'; }
   _trendingShortsCache = null;
   _trendingGenre = 'all';
+  _trendingLastUpdate = 0;
+  _reloadingButton = true;
   fetchTrendingShorts();
-  setTimeout(function() {
-    if (btn) { btn.textContent = String.fromCharCode(0x1f504); btn.style.color = ''; }
-  }, 2000);
 }
 
 function updateTrendingShortsDashboard() {
@@ -2010,11 +2027,12 @@ async function fetchTrendingShorts() {
   if (sourceEl) sourceEl.textContent = '📡 Cargando...';
 
   try {
-    const resp = await fetch('/api/shorts/trending?max_results=20&min_views=100');
+    const resp = await fetch(API_BASE + '/api/shorts/trending?max_results=20&min_views=100');
     const data = await resp.json();
 
     if (data && data.status === 'success') {
       _trendingShortsCache = data;
+      _trendingLastUpdate = Date.now();
       renderTrendingShortsCard();
     } else {
       if (sourceEl) sourceEl.textContent = '⚠️ Error al cargar';
@@ -2027,6 +2045,15 @@ async function fetchTrendingShorts() {
     renderTrendingShortsCard();
   }
   _trendingShortsLoading = false;
+  // Restaurar boton de recarga si estaba activo
+  if (_reloadingButton) {
+    _reloadingButton = false;
+    var btn = document.getElementById('trending-reload-btn');
+    if (btn) {
+      btn.innerHTML = '\uD83D\uDD04';
+      btn.style.color = '';
+    }
+  }
 }
 
 function generateMockTrendingShorts() {
@@ -2090,6 +2117,8 @@ function renderTrendingShortsCard() {
   const shorts = data.shorts || [];
   const totalViews = data.shorts_info?.totalViews || shorts.reduce((a, s) => a + (s.views || 0), 0);
   const uniqueChannels = data.shorts_info?.uniqueChannels || new Set(shorts.map(s => s.channel)).size;
+  const tsEl = document.getElementById('dash-trending-timestamp');
+  if (tsEl) tsEl.textContent = formatTrendingTimestamp(_trendingLastUpdate);
   const sourceLabel = data.trending_source === 'mock' ? '📡 Datos simulados' :
                       data.trending_source === 'trending-shelf' ? '🔥 YouTube Trending' :
                       '🔍 Búsqueda viral';
@@ -2132,7 +2161,7 @@ async function fetchTrendingByGenre(genre) {
     body.innerHTML = "<div style='text-align:center;padding:30px;'><div style='font-size:24px;margin-bottom:12px;'>\u23f3</div><div style='font-size:14px;color:var(--muted);'>Buscando Shorts de " + genre + "...</div></div>";
   }
   try {
-    const resp = await fetch("/api/shorts/trending/music?max_results=20&genre=" + encodeURIComponent(genre) + "&cpm=1.50");
+    const resp = await fetch(API_BASE + "/api/shorts/trending/music?max_results=20&genre=" + encodeURIComponent(genre) + "&cpm=1.50");
     const data = await resp.json();
     if (data && data.status === 'success') {
       renderTrendingModalContent(data);

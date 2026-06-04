@@ -12,27 +12,8 @@ from flask_cors import CORS
 from youtube_scraper import YouTubeScraper
 
 # ── Configuración ──
-# Ruta raíz del proyecto (donde está index.html)
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 app = Flask(__name__)
 CORS(app)  # Permitir conexiones desde el frontend
-
-# ── Frontend (archivos estáticos) ──
-@app.route('/')
-def serve_index():
-    from flask import send_from_directory
-    return send_from_directory(PROJECT_ROOT, 'index.html')
-
-@app.route('/css/<path:filename>')
-def serve_css(filename):
-    from flask import send_from_directory
-    return send_from_directory(os.path.join(PROJECT_ROOT, 'css'), filename)
-
-@app.route('/js/<path:filename>')
-def serve_js(filename):
-    from flask import send_from_directory
-    return send_from_directory(os.path.join(PROJECT_ROOT, 'js'), filename)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('nucleus-api')
@@ -518,5 +499,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     logger.info(f"Iniciando Nuclear AIMA API v1.2 en puerto {port} (debug={debug})")
-    logger.info(f"Serving frontend + API en http://0.0.0.0:{port}")
     app.run(host='0.0.0.0', port=port, debug=debug)

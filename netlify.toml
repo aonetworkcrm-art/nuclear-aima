@@ -1,7 +1,18 @@
+[build]
+  publish = "."
+
+# ── API Proxy al backend Flask en Render ──
+# Las rutas /api/* se redirigen al backend Flask.
+# Reemplaza <tu-app> por la URL real de Render tras el deploy.
+[[redirects]]
+  from = "/api/*"
+  to = "https://nuclear-aima-api.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+# ── Frontend SPA ──
+# Todas las demas rutas sirven index.html (Single Page Application)
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-
-[build]
-  publish = "."
