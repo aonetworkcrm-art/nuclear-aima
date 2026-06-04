@@ -145,7 +145,7 @@ function generateNodesForSong(song, count) {
       id: i + 1,
       title: `${song.name}${i === 0 ? ' (Video Oficial)' : i === 1 ? ' (Audio Oficial)' : type === 'pirate' ? ' (Cover HD)' : ' (En Vivo)'}`,
       channel,
-      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(song.name + ' ' + channel)}`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(song.name)}+${encodeURIComponent(channel)}`,
       views: nodeViews,
       age_days: nodeAgeDays,
       vph,
@@ -226,7 +226,7 @@ function generateShortsForSong(song, count) {
       id: i + 1,
       title,
       channel,
-      url: `https://www.youtube.com/shorts/?search_query=${encodeURIComponent(song.name + ' short')}`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(song.name + ' short')}`,
       views: shortViews,
       age_days: shortAgeDays,
       vph,
@@ -300,7 +300,7 @@ function generateAudioShortsForSong(song, count) {
       id: i + 1,
       title,
       channel,
-      url: `https://www.youtube.com/shorts/?search_query=${encodeURIComponent(song.name + ' cover')}`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(song.name + ' cover')}`,
       views: shortViews,
       age_days: shortAgeDays,
       vph,
@@ -1101,7 +1101,7 @@ function renderNodeView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${n.vph.toFixed(2)}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:${n.isPirate ? 'var(--danger)' : 'var(--orange-bright)'};">$${n.est_usd_per_hour.toFixed(4)}</td>
         <td style="text-align:center;">
-          <a href="${n.url}" target="_blank" class="na-node-link" title="Ver nodo en YouTube">🔗</a>
+          <a href="${n.url}" target="_blank" class="na-node-link" title="Buscar video en YouTube">🔍</a>
           <button class="na-node-remove" onclick="removeNode(${n.id})" title="Eliminar nodo">✕</button>
         </td>
       </tr>
@@ -1492,7 +1492,7 @@ function renderShortsView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent);">${(s.estViewsPerDay || 0).toLocaleString()}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${s.est_usd_per_hour.toFixed(6)}</td>
         <td style="text-align:center;">
-          <a href="${s.url}" target="_blank" class="na-node-link" title="Ver Short en YouTube" onclick="event.stopPropagation()">📱</a>
+          <a href="${s.url}" target="_blank" class="na-node-link" title="Buscar Short en YouTube" onclick="event.stopPropagation()">🔍</a>
         </td>
       </tr>
     `;
@@ -1683,7 +1683,7 @@ function renderAudioShortsView() {
         <td style="text-align:right;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--info-bright);">${s.vph.toFixed(2)}</td>
         <td style="text-align:right;font-family:var(--mono);font-size:12px;color:var(--orange-bright);">$${(s.est_usd_per_hour || 0).toFixed(6)}</td>
         <td style="text-align:center;">
-          <a href="${s.url}" target="_blank" class="na-node-link" title="Ver Short en YouTube">🔗</a>
+          <a href="${s.url}" target="_blank" class="na-node-link" title="Buscar Short en YouTube">🔍</a>
         </td>
       </tr>
     `;
@@ -1821,7 +1821,7 @@ function showShortDetail(short) {
   
   const footerHTML = `
     <button class="btn btn-sm btn-ghost" onclick="closeModal()">Cerrar</button>
-    <a href="${short.url}" target="_blank" class="btn btn-sm" style="background:var(--info-bright);color:#0d0d0f;border:none;text-decoration:none;">📱 Ver en YouTube</a>
+    <a href="${short.url}" target="_blank" class="btn btn-sm" style="background:var(--info-bright);color:#0d0d0f;border:none;text-decoration:none;">🔍 Buscar en YouTube</a>
     <button class="btn btn-sm btn-ghost" onclick="closeModal();showShortsBreakdown()" style="display:${naState.naView === 'shorts' ? 'none' : 'inline-flex'};">📊 Ver todos los Shorts</button>
   `;
   
