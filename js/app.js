@@ -85,7 +85,12 @@ function navigateTo(section) {
     cotizador: ['Cotizador', 'Scaling Flow IA · Servicios Instagram'],
     nodeauditor: ['Node Auditor', 'Auditoría Forense de Nodos Musicales'],
     tools: ['Herramientas', 'Shadow Audit · Copy Generator'],
-    admin: ['Administración', 'Configuración del sistema']
+    admin: ['Administración', 'Configuración del sistema'],
+    jlg: ['JLG 440', 'Juan Luis Guerra · 16 canciones auditadas'],
+    milly: ['Milly Quezada', 'Reina del Merengue · 3 canciones auditadas'],
+    villalona: ['Fernando Villalona', 'El Mayimbe · 3 canciones auditadas'],
+    vargas: ['Wilfrido Vargas', 'Merengue Internacional · 3 canciones auditadas'],
+    multiartist: ['Multi-Artista', 'Consolidado de todos los catálogos auditados']
   };
   const t = titles[section] || ['Nuclear AIMA', ''];
   document.getElementById('topbar-title').textContent = t[0];
@@ -102,6 +107,11 @@ function navigateTo(section) {
   else if (section === 'nodeauditor') renderNodeAuditor();
   else if (section === 'tools') renderTools();
   else if (section === 'admin') renderAdmin();
+  else if (section === 'jlg') renderArtistSection('jlg');
+  else if (section === 'milly') renderArtistSection('milly');
+  else if (section === 'villalona') renderArtistSection('villalona');
+  else if (section === 'vargas') renderArtistSection('vargas');
+  else if (section === 'multiartist') renderMultiArtist();
   else if (section === 'dashboard') {
     updateDashboardKeys();
     updateChecklistProgress();
@@ -844,8 +854,10 @@ function makeSongBatch(names, baseViews, baseNodes, catId) {
   });
 }
 
-/* ── Las 12 canciones auditadas (top por popularidad) ── */
-const AUDITED_SONGS = [
+/* ── CANCIONES AUDITADAS POR ARTISTA ── */
+
+// Ramón Orlando — Top 12 (capitanes del contador fugitivo)
+const RO_AUDITED = [
   { name: 'Te Compro Tu Novia',      nodes: 2100, views: 85000000,  yield: 3400, cat: 'RO-02' },
   { name: 'Loco de Amor',            nodes: 1850, views: 78000000,  yield: 3120, cat: 'RO-01' },
   { name: 'Ring... Ring (El Teléfono)', nodes: 1700, views: 72000000, yield: 2880, cat: 'RO-02' },
@@ -857,8 +869,11 @@ const AUDITED_SONGS = [
   { name: 'Esa Muchacha',            nodes: 720,  views: 39000000,  yield: 1560, cat: 'RO-02' },
   { name: 'El Tiki Tiki del Amor',   nodes: 680,  views: 36000000,  yield: 1440, cat: 'RO-06' },
   { name: 'El Baile del Suá Suá',    nodes: 640,  views: 34000000,  yield: 1360, cat: 'RO-01' },
-  { name: 'América Sin Queja',       nodes: 600,  views: 32000000,  yield: 1280, cat: 'RO-02' },
-  // ── Juan Luis Guerra ──
+  { name: 'América Sin Queja',       nodes: 600,  views: 32000000,  yield: 1280, cat: 'RO-02' }
+];
+
+// Juan Luis Guerra 440
+const JLG_AUDITED = [
   { name: 'Bachata Rosa',               nodes: 2800, views: 180000000, yield: 7200, cat: 'JLG-01' },
   { name: 'Burbujas de Amor',           nodes: 3200, views: 250000000, yield: 10000, cat: 'JLG-01' },
   { name: 'Ojalá Que Llueva Café',      nodes: 1800, views: 120000000, yield: 4800, cat: 'JLG-01' },
@@ -874,20 +889,32 @@ const AUDITED_SONGS = [
   { name: 'El Costo de la Vida',        nodes: 500,  views: 32000000,  yield: 1280, cat: 'JLG-02' },
   { name: 'Para Ti',                    nodes: 480,  views: 30000000,  yield: 1200, cat: 'JLG-03' },
   { name: 'Estrellitas y Duendes',      nodes: 450,  views: 28000000,  yield: 1120, cat: 'JLG-01' },
-  { name: 'Radio Güira',                nodes: 600,  views: 40000000,  yield: 1600, cat: 'JLG-04' },
-  // ── Milly Quezada ──
+  { name: 'Radio Güira',                nodes: 600,  views: 40000000,  yield: 1600, cat: 'JLG-04' }
+];
+
+// Milly Quezada
+const MQ_AUDITED = [
   { name: 'Eras',                       nodes: 600,  views: 40000000,  yield: 1600, cat: 'MQ-01' },
   { name: 'Volvió Juanita',             nodes: 450,  views: 32000000,  yield: 1280, cat: 'MQ-01' },
-  { name: 'Lo Que Más Me Gusta de Ti',  nodes: 400,  views: 28000000,  yield: 1120, cat: 'MQ-01' },
-  // ── Fernando Villalona ──
+  { name: 'Lo Que Más Me Gusta de Ti',  nodes: 400,  views: 28000000,  yield: 1120, cat: 'MQ-01' }
+];
+
+// Fernando Villalona
+const FV_AUDITED = [
   { name: 'El Mayimbe',                 nodes: 500,  views: 35000000,  yield: 1400, cat: 'FV-01' },
   { name: 'La Quiero a Ella',           nodes: 380,  views: 25000000,  yield: 1000, cat: 'FV-01' },
-  { name: 'Celos',                      nodes: 350,  views: 22000000,  yield: 880,  cat: 'FV-01' },
-  // ── Wilfrido Vargas ──
+  { name: 'Celos',                      nodes: 350,  views: 22000000,  yield: 880,  cat: 'FV-01' }
+];
+
+// Wilfrido Vargas
+const WV_AUDITED = [
   { name: 'El Jardinero',               nodes: 700,  views: 48000000,  yield: 1920, cat: 'WV-01' },
   { name: 'Abusadora',                  nodes: 550,  views: 38000000,  yield: 1520, cat: 'WV-01' },
   { name: 'Amanecer',                   nodes: 500,  views: 35000000,  yield: 1400, cat: 'WV-01' }
 ];
+
+// Combinado para compatibilidad con FULL_CATALOG
+const AUDITED_SONGS = [...RO_AUDITED, ...JLG_AUDITED, ...MQ_AUDITED, ...FV_AUDITED, ...WV_AUDITED];
 
 /* ── FULL_CATALOG — 6+ catálogos con canciones reales ── */
 const FULL_CATALOG = [
@@ -1140,14 +1167,19 @@ function computeCatalogStats() {
 
 const CATALOG_STATS = computeCatalogStats();
 
-/* ── Legacy FUGITIVE_SONGS — mantiene compatibilidad ── */
-const FUGITIVE_SONGS = AUDITED_SONGS.map(s => ({
+/* ── FUGITIVE_SONGS — Solo las 12 capitanes de Ramón Orlando ── */
+const FUGITIVE_SONGS = RO_AUDITED.map(s => ({
   name: s.name,
   nodes: s.nodes,
   views: s.views,
   yield: s.yield
 }));
-const FUGITIVE_BASE_VIEWS = CATALOG_STATS.auditedViews; // 491M
+const FUGITIVE_BASE_VIEWS = RO_AUDITED.reduce((a, s) => a + s.views, 0);
+
+// Helper: obtener canciones auditadas de un artista específico
+function getArtistAudited(artistPrefix) {
+  return AUDITED_SONGS.filter(s => s.cat.startsWith(artistPrefix));
+}
 const FUGITIVE_REVENUE_PER_VIEW = CATALOG_REVENUE_PER_VIEW;
 
 /* ── Real-Time Fugitive Views Counter ── */
@@ -1230,8 +1262,8 @@ function showFugitiveBreakdown() {
 
   openModal('📈 Detalle de Reproducciones Fugadas', `
     <div style="margin-bottom:14px;font-size:12px;color:var(--muted);line-height:1.6;">
-      Datos extraídos de la auditoría de las <strong>12 canciones principales</strong> del catálogo de Ramón Orlando.
-      Estas 12 canciones representan el ~7% del catálogo total de 178 canciones.
+      Auditoría de las <strong>${FUGITIVE_SONGS.length} canciones principales</strong> (capitanes) del catálogo de <strong>Ramón Orlando</strong>.
+      Estas ${FUGITIVE_SONGS.length} canciones lideran las 178 canciones totales de su catálogo de 17 álbumes.
       El contador en vivo estima las reproducciones acumuladas desde que se realizó la auditoría.
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
@@ -1244,7 +1276,7 @@ function showFugitiveBreakdown() {
       </tr>
       ${rows}
       <tr style="background:var(--bg3);font-weight:700;">
-        <td style="padding:8px;border:0.5px solid var(--border);color:var(--text);"><strong>TOTALES 12 CANCIONES</strong></td>
+        <td style="padding:8px;border:0.5px solid var(--border);color:var(--text);"><strong>TOTALES ${FUGITIVE_SONGS.length} CANCIONES</strong></td>
         <td class="num" style="padding:8px;border:0.5px solid var(--border);color:var(--text);">3,350+</td>
         <td class="num" style="padding:8px;border:0.5px solid var(--border);color:var(--text);">${formatViewsShort(totalViews)}</td>
         <td class="num" style="padding:8px;border:0.5px solid var(--border);color:#6ecfa5;">$${totalYield.toLocaleString('en-US')}/mes</td>
@@ -1254,7 +1286,7 @@ function showFugitiveBreakdown() {
     <div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:var(--radius);font-size:11px;color:var(--muted);text-align:center;line-height:1.6;">
       💰 <strong>Dinero perdido acumulado:</strong> ${formatMoneyFull(currentMoney)}
       · 📈 <strong>Tasa:</strong> ${getFugitiveViewsPerSec().toLocaleString('en-US')} vistas/segundo
-      · 🎯 <strong>Proyectado:</strong> $19,640/mes solo estas 12 canciones
+      · 🎯 <strong>Proyectado:</strong> ${formatMoneyCompact(totalYield)}/mes · ${FUGITIVE_SONGS.length} canciones auditadas
       <br><span style="font-size:10px;">Fuente: Scalin Flow IA · eCPM $1.20 género tropical</span>
     </div>
     <div style="margin-top:10px;padding:8px;background:rgba(77,171,247,0.06);border:0.5px solid rgba(77,171,247,0.15);border-radius:var(--radius);text-align:center;font-size:10px;color:var(--muted);">
@@ -1345,7 +1377,9 @@ function exportFugitiveReport() {
   doc.setTextColor(180, 180, 180);
   doc.text('Estimado mensual:', 20, 81);
   doc.setTextColor(110, 207, 165);
-  doc.text('$19,640 USD (solo 12 canciones auditadas)', 80, 81);
+  const roYield = FUGITIVE_SONGS.reduce((a, s) => a + s.yield, 0);
+  const estMonthly = roYield >= 1000 ? '$' + (roYield / 1000).toFixed(roYield >= 100000 ? 0 : 1) + 'K' : '$' + roYield.toFixed(0);
+  doc.text(estMonthly + ' USD (' + FUGITIVE_SONGS.length + ' capitanes Ramón Orlando)', 80, 81);
 
   // ── Tabla: 12 canciones ──
   doc.setDrawColor(201, 169, 110);
@@ -1396,7 +1430,7 @@ function exportFugitiveReport() {
   doc.setTextColor(240, 237, 232);
   doc.setFillColor(22, 22, 26);
   doc.rect(14, y - 2, 182, 5, 'F');
-  doc.text('TOTALES 12 CANCIONES', colX[0] + 1, y + 1);
+  doc.text('TOTALES ' + FUGITIVE_SONGS.length + ' CANCIONES', colX[0] + 1, y + 1);
   doc.text('3,350+', colX[1] + colW[1], y + 1, { align: 'right' });
   doc.text(formatViewsShort(totalViews), colX[2] + colW[2], y + 1, { align: 'right' });
   doc.setTextColor(110, 207, 165);
@@ -1584,6 +1618,154 @@ function changeAppPassword() {
   if (input) input.value = '';
   if (status) { status.textContent = '✅ Contraseña actualizada correctamente'; status.style.color = 'var(--success)'; }
   setTimeout(() => { if (status) status.textContent = ''; }, 3000);
+}
+
+/* ── Render Artist Section (JLG, Milly, Villalona, Vargas) ── */
+function renderArtistSection(artistKey) {
+  const container = document.getElementById(artistKey + '-container');
+  if (!container) return;
+
+  const ARTIST_MAP = {
+    jlg: { name: 'Juan Luis Guerra 440', icon: '🎸', color: '#f0c040', bgColor: '#1a2a0a', audited: JLG_AUDITED, cats: ['JLG-01','JLG-02','JLG-03','JLG-04'] },
+    milly: { name: 'Milly Quezada', icon: '👑', color: '#e87d9e', bgColor: '#2a0a1a', audited: MQ_AUDITED, cats: ['MQ-01'] },
+    villalona: { name: 'Fernando Villalona', icon: '🎤', color: '#b87de8', bgColor: '#1a0a2a', audited: FV_AUDITED, cats: ['FV-01'] },
+    vargas: { name: 'Wilfrido Vargas', icon: '🌍', color: '#5c8ce0', bgColor: '#0a1a2a', audited: WV_AUDITED, cats: ['WV-01'] }
+  };
+
+  const artist = ARTIST_MAP[artistKey];
+  if (!artist) return;
+
+  const songs = artist.audited;
+  const totalViews = songs.reduce((a, s) => a + s.views, 0);
+  const totalYield = songs.reduce((a, s) => a + s.yield, 0);
+  const totalNodes = songs.reduce((a, s) => a + s.nodes, 0);
+
+  const songRows = songs.map(s => `
+    <div class="catalog-song-item">
+      <span class="csi-name"><strong>${s.name}</strong></span>
+      <span class="csi-nodes">${s.nodes.toLocaleString('en-US')}</span>
+      <span class="csi-views">${formatViewsShort(s.views)}</span>
+      <span class="csi-yield" style="color:${artist.color};">$${s.yield.toLocaleString('en-US')}/mo</span>
+    </div>
+  `).join('');
+
+  container.innerHTML = `
+    <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius2);padding:20px;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+        <div style="font-size:32px;width:56px;height:56px;display:flex;align-items:center;justify-content:center;background:${artist.bgColor};color:${artist.color};border-radius:var(--radius);">${artist.icon}</div>
+        <div>
+          <h2 style="margin:0;font-size:18px;font-weight:500;">${artist.name}</h2>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px;">${songs.length} canciones auditadas · ${formatViewsShort(totalViews)} vistas · ${formatMoneyCompact(totalYield)}/mes proyectado</div>
+        </div>
+      </div>
+
+      <div class="catalog-card-body" style="border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+        <div style="font-size:10px;padding:8px 16px;color:var(--muted2);display:flex;gap:16px;background:var(--bg3);border-bottom:0.5px solid var(--border);">
+          <span style="flex:1;">Canción</span>
+          <span style="width:60px;text-align:right;">Nodos</span>
+          <span style="width:70px;text-align:right;">Vistas</span>
+          <span style="width:80px;text-align:right;">Yield/mes</span>
+        </div>
+        <div class="catalog-song-list">${songRows}</div>
+        <div class="catalog-total-row">
+          <span>Total ${songs.length} canciones</span>
+          <span style="color:var(--text2);">${totalNodes.toLocaleString('en-US')} nodos</span>
+          <span style="color:var(--text2);">${formatViewsShort(totalViews)}</span>
+          <span style="color:${artist.color};">${formatMoneyCompact(totalYield)}/mo</span>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;">
+        ${artist.cats.map(catId => {
+          const cat = FULL_CATALOG.find(c => c.id === catId);
+          if (!cat) return '';
+          const catSongs = ALL_CATALOG_SONGS.filter(s => s.catalogId === catId);
+          const catYield = catSongs.reduce((a, s) => a + s.yield, 0);
+          return `
+            <div style="flex:1;min-width:180px;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:12px;">
+              <div style="font-size:11px;font-weight:600;color:${cat.color};">${cat.icon} ${cat.id} · ${cat.name}</div>
+              <div style="font-size:10px;color:var(--muted);margin-top:4px;">${catSongs.length} canciones · ${cat.period || ''}</div>
+              <div style="font-size:11px;color:${cat.color};margin-top:4px;">${formatMoneyCompact(catYield)}/mo</div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `;
+}
+
+/* ── Render Multi-Artista Consolidado ── */
+let multiArtistTab = 'all';
+
+function renderMultiArtist() {
+  const container = document.getElementById('multiartist-container');
+  if (!container) return;
+
+  const tabs = [
+    { id: 'all', label: '📀 Todos', color: 'var(--accent)' },
+    { id: 'RO', label: '🎷 Ramón Orlando', color: '#f0c040' },
+    { id: 'JLG', label: '🎸 JLG 440', color: '#f0c040' },
+    { id: 'MQ', label: '👑 Milly Q.', color: '#e87d9e' },
+    { id: 'FV', label: '🎤 Villalona', color: '#b87de8' },
+    { id: 'WV', label: '🌍 Vargas', color: '#5c8ce0' }
+  ];
+
+  let filtered = AUDITED_SONGS;
+  if (multiArtistTab !== 'all') {
+    filtered = AUDITED_SONGS.filter(s => s.cat.startsWith(multiArtistTab));
+  }
+
+  const totalViews = filtered.reduce((a, s) => a + s.views, 0);
+  const totalYield = filtered.reduce((a, s) => a + s.yield, 0);
+  const totalNodes = filtered.reduce((a, s) => a + s.nodes, 0);
+
+  const songRows = filtered.map(s => {
+    const cat = FULL_CATALOG.find(c => c.id === s.cat);
+    const catColor = cat ? cat.color : 'var(--muted)';
+    return `
+      <div class="catalog-song-item">
+        <span class="csi-name"><strong>${s.name}</strong> <span style="font-size:9px;color:var(--muted2);">${s.cat}</span></span>
+        <span class="csi-nodes">${s.nodes.toLocaleString('en-US')}</span>
+        <span class="csi-views">${formatViewsShort(s.views)}</span>
+        <span class="csi-yield" style="color:${catColor};">$${s.yield.toLocaleString('en-US')}/mo</span>
+      </div>
+    `;
+  }).join('');
+
+  const tabHtml = tabs.map(t => `
+    <button class="catalog-filter-tab ${multiArtistTab === t.id ? 'active' : ''}"
+      onclick="multiArtistTab='${t.id}';renderMultiArtist()"
+      style="${multiArtistTab === t.id ? 'border-color:' + t.color + ';color:' + t.color + ';' : ''}">
+      ${t.label}
+    </button>
+  `).join('');
+
+  container.innerHTML = `
+    <div style="margin-bottom:14px;display:flex;gap:6px;flex-wrap:wrap;">${tabHtml}</div>
+
+    <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--accent);">${filtered.length}</div><div class="csp-label">Canciones</div></div>
+      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--tomato-light);">${formatViewsShort(totalViews)}</div><div class="csp-label">Vistas</div></div>
+      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--success-bright);">${formatMoneyCompact(totalYield)}/mes</div><div class="csp-label">Yield</div></div>
+      <div class="catalog-stat-pill"><div class="csp-value" style="color:var(--info-bright);">${totalNodes.toLocaleString('en-US')}</div><div class="csp-label">Nodos</div></div>
+    </div>
+
+    <div class="catalog-card-body" style="border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+      <div style="font-size:10px;padding:8px 16px;color:var(--muted2);display:flex;gap:16px;background:var(--bg3);border-bottom:0.5px solid var(--border);">
+        <span style="flex:1;">Canción · Catálogo</span>
+        <span style="width:60px;text-align:right;">Nodos</span>
+        <span style="width:70px;text-align:right;">Vistas</span>
+        <span style="width:80px;text-align:right;">Yield/mes</span>
+      </div>
+      <div class="catalog-song-list">${songRows}</div>
+      <div class="catalog-total-row">
+        <span>Total ${filtered.length} canciones · ${multiArtistTab === 'all' ? 'Todos los artistas' : tabs.find(t => t.id === multiArtistTab)?.label || ''}</span>
+        <span style="color:var(--text2);">${totalNodes.toLocaleString('en-US')} nodos</span>
+        <span style="color:var(--text2);">${formatViewsShort(totalViews)}</span>
+        <span style="color:var(--success-bright);">${formatMoneyCompact(totalYield)}/mo</span>
+      </div>
+    </div>
+  `;
 }
 
 /* ── Init ── */
