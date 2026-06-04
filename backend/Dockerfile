@@ -11,31 +11,48 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 
 # ── Instala dependencias del sistema necesarias para Chrome ──
-RUN apt-get update && apt-get install -y \
+# python:3.12-slim = Debian Bookworm (nombres t64 para algunas libs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     unzip \
     curl \
     ca-certificates \
     fonts-liberation \
-    libasound2 \
+    libasound2t64 \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
-    libcups2 \
+    libc6 \
+    libcairo2 \
+    libcups2t64 \
+    libdbus-1-3 \
     libdrm2 \
+    libexpat1 \
+    libfontconfig1 \
     libgbm1 \
+    libgcc-s1 \
     libgdk-pixbuf2.0-0 \
+    libglib2.0-0 \
     libgtk-3-0 \
     libnspr4 \
     libnss3 \
-    libu2f-udev \
-    libvulkan1 \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libstdc++6 \
+    libx11-6 \
+    libx11-xcb1 \
+    libxcb1 \
     libxcomposite1 \
+    libxcursor1 \
     libxdamage1 \
+    libxext6 \
     libxfixes3 \
+    libxi6 \
     libxkbcommon0 \
     libxrandr2 \
-    xdg-utils \
+    libxrender1 \
+    libxss1 \
+    libxtst6 \
     && rm -rf /var/lib/apt/lists/*
 
 # ── Instala Google Chrome (stable) ──
