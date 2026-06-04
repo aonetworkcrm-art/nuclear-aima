@@ -1413,17 +1413,17 @@ function renderShortsView() {
     });
   }
   
-  // ── Actualizar paginación ──
-  const pageInfo = document.getElementById('na-shorts-page-info');
-  if (pageInfo) {
-    pageInfo.textContent = `${naState.shortsPage}/${maxPage}`;
-  }
-
   // ── Paginación ──
   const startIdx = (naState.shortsPage - 1) * naState.shortsPerPage;
   const endIdx = Math.min(startIdx + naState.shortsPerPage, shorts.length);
   const pageShorts = shorts.slice(startIdx, endIdx);
   const maxPage = Math.ceil(shorts.length / naState.shortsPerPage);
+
+  // ── Actualizar paginación ──
+  const pageInfo = document.getElementById('na-shorts-page-info');
+  if (pageInfo) {
+    pageInfo.textContent = `${naState.shortsPage}/${maxPage}`;
+  }
 
   // ── Top Bar Chart ──
   const maxViews = consolidated.length > 0 ? consolidated[0].totalViews : 1;
