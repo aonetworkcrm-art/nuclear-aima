@@ -811,7 +811,7 @@ const JLG_ALBUM_13 = ['Radio Güira','Mambo 23','La Gracia de Dios','El Farolito
    ══════════════════════════════════════════════ */
 
 const MQ_ALBUM_1 = ['La Reina del Merengue','Eras','Lo Que Más Me Gusta de Ti','Quiero Amanecer','El Hombre de Tu Vida','Sé Que No','Aprenderé','No Hace Falta Nada','Al Final','Vete y Pregona','Luz de Mi Vida','Hoy Te Confieso','Lluvia de Amor'];
-const MQ_ALBUM_2 = ['Volvió Juanita','Una Vez Más','Me Muero','De Mí','Cómo Será','Déjame','Si No Te Tengo','La Mujer Que Habla','Bendito Amor','Pa' Qué Me Sirve','Te Necesito','Amor Secreto'];
+const MQ_ALBUM_2 = ['Volvió Juanita','Una Vez Más','Me Muero','De Mí','Cómo Será','Déjame','Si No Te Tengo','La Mujer Que Habla','Bendito Amor',"Pa' Qué Me Sirve",'Te Necesito','Amor Secreto'];
 
 /* ══════════════════════════════════════════════
    FERNANDO VILLALONA — Canciones por Álbum
@@ -1539,38 +1539,7 @@ window.navigateTo = function(section) {
   origNavigateTo(section);
 };
 
-/* ── Login / Session ── */
-const DEFAULT_PASSWORD = 'Poppop92@@@';
-
-function getStoredPassword() {
-  try { return localStorage.getItem('na_app_password') || DEFAULT_PASSWORD; }
-  catch { return DEFAULT_PASSWORD; }
-}
-
-function handleLogin() {
-  const input = document.getElementById('login-password');
-  const error = document.getElementById('login-error');
-  const pw = input?.value || '';
-
-  if (pw === getStoredPassword()) {
-    sessionStorage.setItem('na_session', 'authenticated');
-    sessionStorage.setItem('na_session_time', Date.now().toString());
-    document.getElementById('login-overlay').classList.add('hidden');
-    if (error) error.classList.remove('show');
-    if (input) input.value = '';
-  } else {
-    if (error) {
-      error.textContent = '❌ Contraseña incorrecta';
-      error.classList.add('show');
-    }
-    if (input) {
-      input.value = '';
-      input.focus();
-      input.style.borderColor = 'var(--danger)';
-      setTimeout(() => { input.style.borderColor = ''; }, 1500);
-    }
-  }
-}
+/* ── Login / Session (core functions defined in index.html inline script) ── */
 
 function logout() {
   if (!confirm('¿Cerrar sesión? Se requerirá la contraseña nuevamente.')) return;

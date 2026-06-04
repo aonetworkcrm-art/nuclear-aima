@@ -378,8 +378,7 @@
   </div><!-- /main-content -->
 </div><!-- /app-layout -->
 
-<!-- ═══ LOGIN OVERLAY ═══ -->
-<div class="login-overlay" id="login-overlay">
+<!-- ═══ LOGIN OVERLAY ═══ -->    <div class="login-overlay" id="login-overlay">
   <div class="login-box">
     <div class="login-logo">
       <div class="login-logo-icon">NA</div>
@@ -390,9 +389,16 @@
       <div class="login-error" id="login-error"></div>
       <div class="form-group" style="margin:0;">
         <label>Contraseña de acceso</label>
-        <input type="password" id="login-password" placeholder="••••••••" autofocus onkeydown="if(event.key==='Enter')handleLogin()" />
+        <div style="position:relative;">
+          <input type="password" id="login-password" placeholder="••••••••" autofocus
+            style="padding-right:44px;width:100%;padding-left:14px;box-sizing:border-box;"
+            onkeydown="if(event.key==='Enter')handleLogin()" />
+          <button type="button" id="login-pw-toggle" class="pw-toggle-btn"
+            onclick="togglePasswordVisibility()"
+            title="Mostrar contraseña">👁️</button>
+        </div>
       </div>
-      <button class="btn btn-primary btn-lg w-full" onclick="handleLogin()" style="margin-top:14px;justify-content:center;">
+      <button class="btn btn-primary btn-lg w-full" type="button" onclick="handleLogin()" style="margin-top:14px;justify-content:center;">
         🔐 Acceder
       </button>
       <div style="font-size:10px;color:var(--muted2);text-align:center;margin-top:14px;line-height:1.5;">
@@ -415,6 +421,55 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<!-- ═══ LOGIN FUNCTIONS (defined FIRST so they work even if other scripts fail) ═══ -->
+<script>
+/* ── Login / Session ── */
+var NA_PASSWORD_DEFAULT = 'Poppop92@@@';
+var NA_PW_VISIBLE = false;
+
+function naGetPassword() {
+  try { return localStorage.getItem('na_app_password') || NA_PASSWORD_DEFAULT; }
+  catch(e) { return NA_PASSWORD_DEFAULT; }
+}
+
+function togglePasswordVisibility() {
+  var inp = document.getElementById('login-password');
+  var tog = document.getElementById('login-pw-toggle');
+  if (!inp) return;
+  NA_PW_VISIBLE = !NA_PW_VISIBLE;
+  inp.type = NA_PW_VISIBLE ? 'text' : 'password';
+  if (tog) { tog.textContent = NA_PW_VISIBLE ? '🙈' : '👁️'; tog.title = NA_PW_VISIBLE ? 'Ocultar' : 'Mostrar'; }
+  inp.focus();
+}
+
+function handleLogin() {
+  var inp = document.getElementById('login-password');
+  var err = document.getElementById('login-error');
+  var pw = inp ? inp.value : '';
+
+  if (!pw) {
+    if (err) { err.textContent = '🔑 Escribe la contraseña'; err.classList.add('show'); }
+    if (inp) inp.focus();
+    return;
+  }
+
+  if (pw === naGetPassword()) {
+    sessionStorage.setItem('na_session', 'authenticated');
+    sessionStorage.setItem('na_session_time', Date.now().toString());
+    var ov = document.getElementById('login-overlay');
+    if (ov) ov.classList.add('hidden');
+    if (err) { err.classList.remove('show'); err.textContent = ''; }
+    if (inp) { inp.value = ''; inp.type = 'password'; NA_PW_VISIBLE = false; }
+    var tog = document.getElementById('login-pw-toggle');
+    if (tog) { tog.textContent = '👁️'; tog.title = 'Mostrar'; }
+  } else {
+    if (err) { err.textContent = '❌ Contraseña incorrecta'; err.classList.add('show'); }
+    if (inp) { inp.value = ''; inp.focus(); }
+  }
+}
+</script>
+
 <script src="js/cotizador.js"></script>
 <script src="js/masterplan.js"></script>
 <script src="js/tools.js"></script>

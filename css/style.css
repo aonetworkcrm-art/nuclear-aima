@@ -2119,6 +2119,34 @@ a:hover { color: var(--accent2); }
   font-size: 14px;
 }
 
+/* Password visibility toggle */
+.pw-toggle-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+  font-family: var(--font);
+}
+
+.pw-toggle-btn:hover {
+  color: var(--text);
+  background: var(--bg4);
+}
+
+.pw-toggle-btn:active {
+  color: var(--accent);
+  background: var(--bg5);
+}
+
 /* ═══ MISC ═══ */
 .text-accent { color: var(--accent); }
 .text-muted { color: var(--muted); }
