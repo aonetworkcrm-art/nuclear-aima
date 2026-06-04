@@ -178,11 +178,13 @@ class YouTubeScraper:
 
     def _extract_yt_initial_data(self, timeout=10, poll_interval=0.5):
         """Extrae el objeto ytInitialData del DOM vía JavaScript.
-        Usa XPath para encontrar el script tag que contiene ytInitialData,
-        mucho más confiable que el querySelector con :contains() (XPath puro).
         
-        Incluye reintentos automáticos con timeout configurable para
-        manejar páginas que tardan en cargar.
+        Estrategia:
+        1. Acceso directo a window.ytInitialData (más rápido y confiable)
+        2. Fallback: extrae de script tags con regex (útil en páginas
+           donde window.ytInitialData no está definido)
+        
+        Incluye reintentos automáticos con timeout configurable.
         
         Args:
             timeout: Tiempo máximo en segundos para esperar (default: 10)
@@ -196,20 +198,27 @@ class YouTubeScraper:
         for attempt in range(1, max_attempts + 1):
             try:
                 data = self.driver.execute_script(
+                    # Estrategia 1: acceso directo a ventana
                     'try {'
                     '  if (window.ytInitialData) return window.ytInitialData;'
-                    '  var xpathResult = document.evaluate(\'//script[contains(text(),"ytInitialData")]\', '
-                    '    document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);'
-                    '  var scriptTag = xpathResult.singleNodeValue;'
-                    '  if (!scriptTag) return null;'
-                    '  var raw = scriptTag.textContent || scriptTag.innerText || \'\';'
-                    '  var cleaned = raw.replace(\'window.ytInitialData = \', \'\').trim();'
-                    '  if (cleaned.charAt(cleaned.length - 1) === \';\') cleaned = cleaned.slice(0, -1);'
-                    '  return JSON.parse(cleaned);'
+                    '  var scripts = document.querySelectorAll("script");'
+                    '  for (var s of scripts) {'
+                    '    var t = s.textContent || "";'
+                    '    if (t.indexOf("ytInitialData") >= 0) {'
+                    '      var idx = t.indexOf("{");'
+                    '      if (idx >= 0) {'
+                    '        var end = t.lastIndexOf("}");'
+                    '        if (end > idx) {'
+                    '          return JSON.parse(t.substring(idx, end + 1));'
+                    '        }'
+                    '      }'
+                    '    }'
+                    '  }'
+                    '  return null;'
                     '} catch(e) { return null; }'
                 )
                 
-                if data is not None:
+                if data is not None and isinstance(data, dict):
                     if attempt > 1:
                         print(f"[YouTubeScraper] ytInitialData obtenido en intento #{attempt}")
                     return data
@@ -328,7 +337,11 @@ class YouTubeScraper:
     def _parse_reel_item(self, item, query):
         """Parsea un reelItemRenderer del JSON de YouTube."""
         try:
-            reel = item.get('reelItemRenderer', {}) or item.get('richItemRenderer', {}).get('content', {}).get('reelItemRenderer', {})
+            reel = item.get('reelItemRenderer')
+            if not reel:
+                rich = item.get('richItemRenderer', {})
+                if isinstance(rich, dict):
+                    reel = rich.get('content', {}).get('reelItemRenderer')
             if not reel:
                 return None
 
@@ -450,14 +463,117 @@ class YouTubeScraper:
     #  dentro de la página del video.
     # ─────────────────────────────────────────────
 
+    def _find_reel_shelves_in_tree(self, obj, depth=0, max_depth=12):
+        """Busca recursivamente TODOS los objetos reelShelfRenderer en el árbol JSON.
+
+        YouTube puede colocar los shelves en diferentes lugares del ytInitialData
+        dependiendo del tipo de página (watch, search, trending):
+        - engagementPanels[].structuredDescriptionContentRenderer.items[]
+        - twoColumnWatchNextResults.results.results.contents[]
+        - secondaryResults.secondaryResults.results[]
+        - sectionListRenderer.contents[]
+
+        Este método escanea todo el árbol sin importar la ruta exacta.
+        NO se detiene al encontrar el primero — recolecta TODOS.
+
+        Args:
+            obj: Nodo del árbol JSON (dict o list)
+            depth: Profundidad actual (para evitar recursión infinita)
+            max_depth: Máxima profundidad de búsqueda
+
+        Returns:
+            Lista de tuplas (shelf_dict, shelf_title)
+        """
+        shelves = []
+        if depth > max_depth or obj is None:
+            return shelves
+
+        if isinstance(obj, dict):
+            # ¿Este dict TIENE la clave 'reelShelfRenderer'?
+            if 'reelShelfRenderer' in obj:
+                reel = obj['reelShelfRenderer']
+                if isinstance(reel, dict):
+                    title_runs = reel.get('title', {}).get('runs', [])
+                    title = ' '.join(r.get('text', '') for r in title_runs) if title_runs else ''
+                    shelves.append((reel, title))
+                # NO retornamos — seguimos buscando en otros lugares
+
+            # Seguir buscando en todos los values (incluyendo el propio reel si es dict)
+            for v in obj.values():
+                shelves.extend(self._find_reel_shelves_in_tree(v, depth + 1, max_depth))
+
+        elif isinstance(obj, list):
+            for item in obj:
+                shelves.extend(self._find_reel_shelves_in_tree(item, depth + 1, max_depth))
+
+        return shelves
+
+    def _scroll_and_wait_for_shorts_shelf(self, max_wait=12):
+        """Hace scroll hacia abajo en la página del video y espera a que
+        aparezca el shelf de Shorts (cargado dinámicamente).
+
+        YouTube carga la sección 'Shorts con este audio' de forma
+        asíncrona después del render inicial. Este método:
+        1. Hace scroll first a 60%, luego a 100% del scrollHeight
+        2. Intenta expandir la descripción (trigger de engagement panels)
+        3. Espera hasta que aparezcan elementos reel-item-renderer
+           en el área de contenido principal
+
+        Returns:
+            True si el shelf fue encontrado, False si no
+        """
+        try:
+            # Scroll progresivo para activar carga dinámica
+            for i in range(3):
+                self.driver.execute_script('window.scrollTo(0, 600);')
+                time.sleep(1)
+                self.driver.execute_script('window.scrollTo(0, document.body.scrollHeight);')
+                time.sleep(1)
+
+            # Intentar expandir la descripción (activa engagement panels)
+            try:
+                more_btn = self.driver.find_element(By.CSS_SELECTOR,
+                    '#description-inline-expander ytd-button-renderer, '
+                    '#description yt-formatted-string.ytd-video-secondary-info-renderer'
+                )
+                more_btn.click()
+                print(f"[YouTubeScraper] Descripción expandida")
+                time.sleep(1.5)
+            except Exception:
+                pass  # No hay botón expandir o ya está expandido
+
+            # Esperar elementos de Shorts (selector más específico)
+            wait = WebDriverWait(self.driver, max_wait)
+            try:
+                wait.until(
+                    EC.presence_of_element_located((
+                        By.CSS_SELECTOR,
+                        'ytd-reel-item-renderer, '
+                        '#engagement-panel-shorts ytd-reel-item-renderer, '
+                        'ytd-structured-description-content-renderer ytd-reel-item-renderer'
+                    ))
+                )
+                print(f"[YouTubeScraper] Shelf de Shorts encontrado dinámicamente")
+                return True
+            except TimeoutException:
+                print(f"[YouTubeScraper] No se encontraron Shorts tras {max_wait}s de espera")
+                return False
+
+        except Exception as e:
+            print(f"[YouTubeScraper] Error en scroll: {e}")
+            return False
+
     def get_shorts_with_this_audio(self, video_url, max_results=50):
         """
         Extrae los Shorts que usan la misma pista de audio que
         un video específico de YouTube.
 
-        Estos aparecen en la sección "Shorts con este audio"
-        dentro de la página /watch del video. YouTube los genera
-        automáticamente detectando coincidencias de audio.
+        Estos aparecen en la sección "Shorts con este audio" / "Shorts que
+        recrean este video" dentro de la página /watch del video.
+        YouTube los carga DINÁMICAMENTE — este método:
+        1. Extrae vía ytInitialData (si está disponible)
+        2. Si no, hace scroll y espera la carga dinámica
+        3. Extrae del DOM con BeautifulSoup como fallback
 
         Args:
             video_url: URL completa del video de YouTube
@@ -481,81 +597,88 @@ class YouTubeScraper:
             WebDriverWait(self.driver, self.timeout).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, '#movie_player, ytd-watch-flexy, #contents'))
             )
-            time.sleep(3)  # dejar que JS termine de renderizar los shelves
+            time.sleep(3)
 
-            # Extraer ytInitialData
+            # ── ESTRATEGIA 1: ytInitialData (rápido, si está disponible) ──
             initial_data = self._extract_yt_initial_data()
-            if not initial_data:
-                print("[YouTubeScraper] No se pudo extraer ytInitialData del video")
-                return shorts
+            if initial_data:
+                all_shelves = self._find_reel_shelves_in_tree(initial_data)
+                print(f"[YouTubeScraper] Encontrados {len(all_shelves)} reelShelfRenderer en ytInitialData")
 
-            # Navegar por la estructura de la página del video
-            try:
-                contents = (initial_data.get('contents', {})
-                            .get('twoColumnWatchNextResults', {})
-                            .get('results', {})
-                            .get('results', {})
-                            .get('contents', []))
-            except AttributeError:
-                print("[YouTubeScraper] Estructura de contenido no encontrada en /watch")
-                return shorts
+                audio_shelves = []
+                for shelf, title in all_shelves:
+                    title_lower = title.lower()
+                    audio_keywords = [
+                        'shorts', 'audio', 'sound', 'remix', 'song', 'canción',
+                        'este audio', 'this audio', 'this sound', 'este sonido',
+                        'se usa en', 'used in', 'shorts que usan',
+                        'short', 'viral', 'recrean'
+                    ]
+                    if any(kw in title_lower for kw in audio_keywords) or not title:
+                        audio_shelves.append((shelf, title))
 
-            # Buscar reelShelfRenderer en los contents
-            # Puede estar anidado dentro de itemSectionRenderer
-            for content_item in contents:
-                if len(shorts) >= max_results:
-                    break
-
-                # Buscar reelShelfRenderer directo
-                reel_shelf = content_item.get('reelShelfRenderer', None)
-
-                # O buscar dentro de itemSectionRenderer
-                if not reel_shelf:
-                    item_section = content_item.get('itemSectionRenderer', {})
-                    for sub_item in item_section.get('contents', []):
-                        reel_shelf = sub_item.get('reelShelfRenderer', None)
-                        if reel_shelf:
+                if audio_shelves:
+                    for reel_shelf, shelf_title in audio_shelves:
+                        if len(shorts) >= max_results:
                             break
+                        print(f"[YouTubeScraper] Shelf (JSON): '{shelf_title}'")
+                        items = reel_shelf.get('items', [])
+                        for item in items:
+                            if len(shorts) >= max_results:
+                                break
+                            short = self._parse_reel_item(item, shelf_title)
+                            if short and short['video_id'] not in seen_ids:
+                                seen_ids.add(short['video_id'])
+                                short['id'] = len(shorts) + 1
+                                short['source'] = 'audio-shelf'
+                                short['audioSource'] = video_url
+                                shorts.append(short)
 
-                if not reel_shelf:
-                    continue
+            # ── ESTRATEGIA 2: Scroll + esperar carga dinámica ──
+            if len(shorts) < max_results:
+                print("[YouTubeScraper] Intentando carga dinámica del shelf...")
+                shelf_encontrado = self._scroll_and_wait_for_shorts_shelf()
 
-                # Verificar que el título del shelf mencione "shorts" y "audio"/"song"
-                title_runs = reel_shelf.get('title', {}).get('runs', [])
-                shelf_title = ' '.join(r.get('text', '') for r in title_runs).lower()
+                if shelf_encontrado:
+                    # Re-extraer ytInitialData (ahora con datos dinámicos)
+                    initial_data2 = self._extract_yt_initial_data()
+                    if initial_data2:
+                        all_shelves2 = self._find_reel_shelves_in_tree(initial_data2)
+                        for shelf, title in all_shelves2:
+                            if len(shorts) >= max_results:
+                                break
+                            title_lower = title.lower()
+                            if any(kw in title_lower for kw in [
+                                'shorts', 'audio', 'sound', 'remix',
+                                'recrean', 'viral'
+                            ]) or not title:
+                                items = shelf.get('items', [])
+                                for item in items:
+                                    if len(shorts) >= max_results:
+                                        break
+                                    vid_id = (item.get('reelItemRenderer') or {}).get('videoId', '')
+                                    if vid_id and vid_id not in seen_ids:
+                                        short = self._parse_reel_item(item, title or 'Shorts')
+                                        if short:
+                                            seen_ids.add(vid_id)
+                                            short['id'] = len(shorts) + 1
+                                            short['source'] = 'audio-shelf-dynamic'
+                                            short['audioSource'] = video_url
+                                            shorts.append(short)
 
-                # Buscar shelves que contengan shorts con audio
-                # Títulos comunes: "Shorts with this audio", "Shorts con este audio",
-                # "Shorts with this sound", "Use this sound", "Remixes"
-                is_audio_shelf = any(kw in shelf_title for kw in [
-                    'shorts', 'audio', 'sound', 'remix', 'song', 'canción',
-                    'este audio', 'this audio', 'this sound', 'este sonido'
-                ])
-
-                if not is_audio_shelf:
-                    # Si el título no tiene palabras clave pero es un reel shelf,
-                    # igual lo procesamos (puede ser el único shelf de shorts)
-                    has_short_title = any(kw in shelf_title for kw in ['short'])
-                    if not has_short_title:
-                        continue
-
-                print(f"[YouTubeScraper] Encontrado shelf: '{shelf_title}'")
-
-                # Parsear items del shelf
-                items = reel_shelf.get('items', [])
-                for item in items:
-                    if len(shorts) >= max_results:
-                        break
-
-                    short = self._parse_reel_item(item, shelf_title)
-                    if short and short['video_id'] not in seen_ids:
-                        seen_ids.add(short['video_id'])
-                        short['id'] = len(shorts) + 1
-                        short['source'] = 'audio-shelf'
-                        short['audioSource'] = video_url
-                        shorts.append(short)
-
-                print(f"[YouTubeScraper] Extraídos {len(shorts)} Shorts del shelf de audio")
+                    # ── ESTRATEGIA 3: DOM (fallback definitivo) ──
+                    if len(shorts) < max_results:
+                        dom_shorts = self._extract_shorts_from_video_dom(max_results - len(shorts), seen_ids)
+                        for s in dom_shorts:
+                            if len(shorts) >= max_results:
+                                break
+                            vid = s.get('video_id', '')
+                            if vid and vid not in seen_ids:
+                                seen_ids.add(vid)
+                                s['id'] = len(shorts) + 1
+                                s['source'] = 'audio-shelf-dom'
+                                s['audioSource'] = video_url
+                                shorts.append(s)
 
             print(f"[YouTubeScraper] Total Shorts con este audio: {len(shorts)}")
 
@@ -565,6 +688,73 @@ class YouTubeScraper:
             print(f"[YouTubeScraper] Error: {e}")
             import traceback
             traceback.print_exc()
+
+        return shorts
+
+    def _extract_shorts_from_video_dom(self, max_results, seen_ids):
+        """Extrae Shorts del DOM de una página de video (/watch).
+        Busca elementos ytd-reel-item-renderer y enlaces /shorts/."""
+        shorts = []
+        try:
+            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+
+            # Buscar reel items
+            reel_items = soup.select('ytd-reel-item-renderer')
+            for el in reel_items:
+                if len(shorts) >= max_results:
+                    break
+                try:
+                    link = el.select_one('a[href*="/shorts/"]')
+                    if not link:
+                        continue
+                    href = link.get('href', '')
+                    video_id = href.split('/shorts/')[-1].split('?')[0] if '/shorts/' in href else ''
+                    if video_id in seen_ids:
+                        continue
+
+                    title = link.get('title') or link.text.strip() or 'Shorts'
+                    channel_el = el.select_one('ytd-channel-name a, a[href*="/@"]')
+                    channel = channel_el.text.strip()[:60] if channel_el else 'Desconocido'
+
+                    views = 0
+                    aria = el.get('aria-label', '')
+                    if aria:
+                        vm = re.search(r'([\d.]+[kmb]?)\s*view', aria.lower())
+                        if vm:
+                            views = parse_views(vm.group(1))
+
+                    shorts.append({
+                        'id': 0, 'title': title[:120], 'channel': channel,
+                        'url': f'https://www.youtube.com/shorts/{video_id}',
+                        'video_id': video_id, 'views': views or 1000,
+                        'age_days': 30, 'vph': calculate_vph(views or 1000, 30),
+                        'duration': '0:00-1:00',
+                        'isPirate': is_pirate_channel(channel), 'isOfficial': False
+                    })
+                except Exception:
+                    continue
+
+            # Fallback: buscar enlaces /shorts/ generales
+            if len(shorts) < max_results:
+                for link in soup.select('a[href*="/shorts/"]'):
+                    if len(shorts) >= max_results:
+                        break
+                    href = link.get('href', '')
+                    video_id = href.split('/shorts/')[-1].split('?')[0] if '/shorts/' in href else ''
+                    if not video_id or video_id in seen_ids:
+                        continue
+                    title = link.get('title') or link.text.strip() or 'Shorts'
+                    shorts.append({
+                        'id': 0, 'title': title[:120], 'channel': 'Desconocido',
+                        'url': f'https://www.youtube.com/shorts/{video_id}',
+                        'video_id': video_id, 'views': 1000,
+                        'age_days': 30, 'vph': calculate_vph(1000, 30),
+                        'duration': '0:00-1:00',
+                        'isPirate': False, 'isOfficial': False
+                    })
+
+        except Exception as e:
+            print(f"[YouTubeScraper] Error DOM video: {e}")
 
         return shorts
 
@@ -1196,6 +1386,11 @@ class YouTubeScraper:
                 video_url = candidate.get('url', '')
                 if not video_url or 'youtube.com' not in video_url:
                     continue
+                # Extraer video ID con regex (maneja URLs con parametros extras)
+                vid_match = re.search(r'[?&]v=([a-zA-Z0-9_-]{11})', video_url)
+                if not vid_match:
+                    continue
+                video_url = f'https://www.youtube.com/watch?v={vid_match.group(1)}'
 
                 try:
                     print(f"[Scraper] Extrayendo Shorts con este audio desde: {video_url}")
@@ -1266,18 +1461,23 @@ if __name__ == '__main__':
         elif mode == 'audio':
             # Modo 2: Shorts con este audio
             video_id = sys.argv[3] if len(sys.argv) > 3 else ''
-            if not video_id:
+            video_url = ''
+            if video_id:
+                video_url = f"https://www.youtube.com/watch?v={video_id}"
+            else:
                 # Buscar el video primero
                 print(f"═ Buscando nodos para: {query} ═")
                 nodes = scraper.search_song(query, max_results=5)
                 if nodes:
                     best = max(nodes, key=lambda n: (2 if n.get('isOfficial') else 1, n.get('views', 0)))
-                    video_id = best.get('url', '').split('=')[-1].split('&')[0]
-                    print(f"Mejor candidato: {best.get('title')} -> {video_id}")
+                    vid_match = re.search(r'[?&]v=([a-zA-Z0-9_-]{11})', best.get('url', ''))
+                    if vid_match:
+                        video_id = vid_match.group(1)
+                        video_url = f"https://www.youtube.com/watch?v={video_id}"
+                        print(f"Mejor candidato: {best.get('title')} -> {video_id}")
             
-            if video_id:
-                url = f"https://www.youtube.com/watch?v={video_id}"
-                shorts = scraper.get_shorts_with_this_audio(url, max_results=30)
+            if video_url:
+                shorts = scraper.get_shorts_with_this_audio(video_url, max_results=30)
                 info = scraper.get_shorts_info(shorts)
                 print(json.dumps({'video_id': video_id, 'shorts': shorts, 'info': info},
                                  indent=2, ensure_ascii=False))
