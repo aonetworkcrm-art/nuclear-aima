@@ -40,6 +40,10 @@
         <span class="nav-icon">🕸️</span> Node Auditor
         <span class="nav-badge">NEW</span>
       </button>
+      <button class="nav-item" data-section="cpc" onclick="navigateTo('cpc')">
+        <span class="nav-icon">📊</span> CPC Investigator
+        <span class="nav-badge" style="background:var(--accent);color:#0d0d0f;">NEW</span>
+      </button>
       <button class="nav-item" data-section="tools" onclick="navigateTo('tools')">
         <span class="nav-icon">🛠️</span> Tools
         <span class="nav-badge">2</span>
@@ -397,6 +401,11 @@
 
       
 
+      <!-- ═══ CPC INVESTIGATOR ═══ -->
+      <div class="section" id="section-cpc">
+        <div id="cpc-container"></div>
+      </div>
+
       <!-- ═══ NODE AUDITOR ═══ -->
       <div class="section" id="section-nodeauditor">
         <div class="page-header">
@@ -471,6 +480,7 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 
 <!-- ═══ LOGIN FUNCTIONS (defined FIRST so they work even if other scripts fail) ═══ -->
 <script>
@@ -525,5 +535,11 @@ function handleLogin() {
 <script src="js/tools.js"></script>
 <script src="js/app.js"></script>
 <script src="js/nodeauditor.js"></script>
+<script src="js/cpc-dorking.js"></script>
+<script src="js/cpc-osint.js"></script>
+<script src="js/cpc-viral-scanner.js"></script>
+<script src="js/cpc-seo-generator.js"></script>
+<script src="js/cpc-blogger-scheduler.js"></script>
+<script src="js/cpc-investigator.js"></script>
 </body>
 </html>

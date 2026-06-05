@@ -84,6 +84,7 @@ function navigateTo(section) {
     masterplan: ['Master Plan', 'Manual Maestro de Infraestructura Digital'],
     cotizador: ['Cotizador', 'Scaling Flow IA · Servicios Instagram'],
     nodeauditor: ['Node Auditor', 'Auditoría Forense de Nodos Musicales'],
+    cpc: ['CPC Investigator', 'Análisis de Nichos de Alto CPC · AdSense + Monetag'],
     tools: ['Herramientas', 'Shadow Audit · Copy Generator'],
     admin: ['Administración', 'Configuración del sistema']
   };
@@ -100,6 +101,7 @@ function navigateTo(section) {
   if (section === 'masterplan') renderMasterPlan();
   else if (section === 'cotizador') renderCotizador();
   else if (section === 'nodeauditor') renderNodeAuditor();
+  else if (section === 'cpc') renderCPCInvestigator();
   else if (section === 'tools') renderTools();
   else if (section === 'admin') renderAdmin();
   else if (section === 'dashboard') {
