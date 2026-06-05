@@ -1407,7 +1407,9 @@ function changeAppPassword() {
 }
 
 /* ══════════════════════════════════════════════
-   UNIVERSAL SEARCH — Busca en toda la app
+/* ══════════════════════════════════════════════
+   UNIVERSAL SEARCH — Busca en TODA la app (Nuclear Search)
+   16 fuentes de datos | 80 resultados máx | La bestia total
    ══════════════════════════════════════════════ */
 
 function universalSearch(query) {
@@ -1415,112 +1417,104 @@ function universalSearch(query) {
   const clearBtn = document.getElementById('us-clear');
   const q = query.trim().toLowerCase();
 
-  // Show/hide clear button
-  if (clearBtn) {
-    clearBtn.style.display = q.length > 0 ? 'flex' : 'none';
-  }
+  if (clearBtn) clearBtn.style.display = q.length > 0 ? 'flex' : 'none';
 
   if (!q || q.length < 2) {
     if (dropdown) dropdown.classList.remove('open');
     return;
   }
 
-  const results = [];
+  if (!window._usActions) window._usActions = [];
+  window._usActions.length = 0;
 
-  // ── 1. Buscar en CPC Nichos ──
+  const MAX = 80;
+  const results = [];
+  const push = (r) => { if (results.length < MAX) { results.push(r); return true; } return false; };
+
+  // ═══════════════════════════════════════════════
+  //  1. CPC NICHOS — 50+ nichos de alto CPC
+  // ═══════════════════════════════════════════════
   if (typeof CPC_NICHES !== 'undefined') {
     CPC_NICHES.forEach(n => {
-      if (results.length >= 40) return;
+      if (results.length >= MAX) return;
       const matchName = n.name.toLowerCase().includes(q);
       const matchKeywords = n.keywords.toLowerCase().includes(q);
       const matchCat = n.cat.toLowerCase().includes(q);
       const matchAngles = n.contentAngles.toLowerCase().includes(q);
       if (matchName || matchKeywords || matchCat || matchAngles) {
         const sub = matchCat ? '📊 ' + n.cat : '🔑 ' + n.keywords.substring(0, 60);
-        results.push({
-          section: 'CPC - Nichos',
-          sectionIcon: '📊',
-          icon: n.icon,
-          iconBg: '#2a1a0a',
-          iconColor: '#f0c040',
-          title: n.name,
-          subtitle: sub.substring(0, 80),
+        push({
+          section: 'CPC - Nichos', sectionIcon: '📊',
+          icon: n.icon, iconBg: '#2a1a0a', iconColor: '#f0c040',
+          title: n.name, subtitle: sub.substring(0, 80),
           action: function() { navigateTo('cpc'); switchCPCTab('research'); showNicheDetail(n.id); },
-          sectionBadge: 'CPC',
-          badgeColor: 'var(--accent)'
+          sectionBadge: 'CPC', badgeColor: 'var(--accent)'
         });
       }
     });
   }
 
-  // ── 2. Buscar en Master Plan ──
+  // ═══════════════════════════════════════════════
+  //  2. MASTER PLAN — 18 secciones del manual
+  // ═══════════════════════════════════════════════
   if (typeof MASTER_SECTIONS !== 'undefined') {
     MASTER_SECTIONS.forEach(s => {
-      if (results.length >= 40) return;
+      if (results.length >= MAX) return;
       const matchTitle = s.title.toLowerCase().includes(q);
       const matchSub = s.subtitle.toLowerCase().includes(q);
       const matchContent = s.content && s.content.toLowerCase().includes(q);
       if (matchTitle || matchSub || matchContent) {
-        results.push({
-          section: 'Master Plan',
-          sectionIcon: '📚',
-          icon: s.icon,
-          iconBg: s.iconBg || '#1a1a2a',
-          iconColor: s.iconColor || '#c9a96e',
-          title: s.title.replace(/\d+\.\s*/, '').substring(0, 60),
-          subtitle: s.subtitle,
+        push({
+          section: 'Master Plan', sectionIcon: '📚',
+          icon: s.icon, iconBg: s.iconBg || '#1a1a2a', iconColor: s.iconColor || '#c9a96e',
+          title: s.title.replace(/\d+\.\s*/, '').substring(0, 60), subtitle: s.subtitle,
           action: function() { navigateTo('masterplan'); navigateMasterSection(s.id); },
-          sectionBadge: 'Plan',
-          badgeColor: 'var(--success)'
+          sectionBadge: 'Plan', badgeColor: 'var(--success)'
         });
       }
     });
   }
 
-  // ── 3. Buscar en el Catálogo de Canciones ──
+  // ═══════════════════════════════════════════════
+  //  3. CATÁLOGO — 178 canciones de Ramón Orlando
+  // ═══════════════════════════════════════════════
   if (typeof ALL_CATALOG_SONGS !== 'undefined') {
     const songs = getAllCatalogSongs();
     songs.forEach(s => {
-      if (results.length >= 40) return;
+      if (results.length >= MAX) return;
       if (s.name.toLowerCase().includes(q)) {
-        results.push({
-          section: 'Catálogo',
-          sectionIcon: '💿',
-          icon: '🎵',
-          iconBg: '#0a2a1a',
-          iconColor: '#2ecc71',
-          title: s.name,
-          subtitle: (s.catalogName || s.catalogId) + ' · ' + (s.views || 0).toLocaleString('en-US') + ' vistas',
+        push({
+          section: 'Catálogo', sectionIcon: '💿',
+          icon: '🎵', iconBg: '#0a2a1a', iconColor: '#2ecc71',
+          title: s.name, subtitle: (s.catalogName || s.catalogId) + ' · ' + (s.views || 0).toLocaleString('en-US') + ' vistas',
           action: function() { navigateTo('dashboard'); document.getElementById('dash-catalog-card')?.scrollIntoView({behavior:'smooth'}); catalogFilter=s.catalogId;renderFullCatalog(); },
-          sectionBadge: 'Canción',
-          badgeColor: 'var(--success-bright)'
+          sectionBadge: 'Canción', badgeColor: 'var(--success-bright)'
         });
       }
     });
   }
 
-  // ── 4. Buscar en CPC tabs ──
+  // ═══════════════════════════════════════════════
+  //  4. CPC TABS — Herramientas del Investigator
+  // ═══════════════════════════════════════════════
   if (typeof CPC_TABS !== 'undefined') {
     CPC_TABS.forEach(t => {
-      if (results.length >= 40) return;
+      if (results.length >= MAX) return;
       if (t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)) {
-        results.push({
-          section: 'CPC Investigator',
-          sectionIcon: '📊',
-          icon: t.icon,
-          iconBg: '#1a1a2a',
-          iconColor: t.color,
-          title: t.label,
-          subtitle: t.desc,
+        push({
+          section: 'CPC Investigator', sectionIcon: '📊',
+          icon: t.icon, iconBg: '#1a1a2a', iconColor: t.color,
+          title: t.label, subtitle: t.desc,
           action: function() { navigateTo('cpc'); switchCPCTab(t.id); },
-          sectionBadge: 'Herramienta',
-          badgeColor: 'var(--info-bright)'
+          sectionBadge: 'Herramienta', badgeColor: 'var(--info-bright)'
         });
       }
     });
   }
 
-  // ── 5. Buscar en secciones de navegación ──
+  // ═══════════════════════════════════════════════
+  //  5. NAVEGACIÓN — Secciones del sistema
+  // ═══════════════════════════════════════════════
   const navSections = [
     { id: 'dashboard', icon: '📊', name: 'Dashboard', desc: 'Resumen general del sistema' },
     { id: 'masterplan', icon: '📚', name: 'Master Plan', desc: 'Manual Maestro de Infraestructura Digital' },
@@ -1531,51 +1525,222 @@ function universalSearch(query) {
     { id: 'admin', icon: '⚙️', name: 'Admin', desc: 'Configuración del sistema' },
   ];
   navSections.forEach(ns => {
-    if (results.length >= 40) return;
+    if (results.length >= MAX) return;
     if (ns.name.toLowerCase().includes(q) || ns.desc.toLowerCase().includes(q)) {
-      results.push({
-        section: 'Navegación',
-        sectionIcon: '📍',
-        icon: ns.icon,
-        iconBg: '#1a1a2a',
-        iconColor: '#7db8e8',
-        title: ns.name,
-        subtitle: ns.desc,
+      push({
+        section: 'Navegación', sectionIcon: '📍',
+        icon: ns.icon, iconBg: '#1a1a2a', iconColor: '#7db8e8',
+        title: ns.name, subtitle: ns.desc,
         action: function() { navigateTo(ns.id); },
-        sectionBadge: 'Ir',
-        badgeColor: 'var(--muted)'
+        sectionBadge: 'Ir', badgeColor: 'var(--muted)'
       });
     }
   });
 
-  // ── 6. Buscar en Herramientas (Tools) ──
-  const toolsItems = [
-    { name: 'Shadow Audit', desc: 'Auditoría de catálogos musicales', icon: '🛠️' },
-    { name: 'Copy Generator', desc: 'Generación de textos de marketing', icon: '✍️' },
+  // ═══════════════════════════════════════════════
+  //  6. TOOLS — Shadow Audit, Copy Generator
+  // ═══════════════════════════════════════════════
+  if (typeof TOOLS !== 'undefined') {
+    TOOLS.forEach(t => {
+      if (results.length >= MAX) return;
+      if (t.title.toLowerCase().includes(q) || (t.desc && t.desc.toLowerCase().includes(q))) {
+        push({
+          section: 'Herramientas', sectionIcon: '🛠️',
+          icon: t.icon || '🛠️', iconBg: '#1a1a2a', iconColor: '#5c8ce0',
+          title: t.title, subtitle: t.desc || '',
+          action: function() { navigateTo('tools'); if(t.id) location.hash = '#' + t.id; },
+          sectionBadge: 'Tool', badgeColor: 'var(--info)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  7. DORKS — 65+ Google Dorks de alto impacto
+  // ═══════════════════════════════════════════════
+  if (typeof DORKS !== 'undefined') {
+    DORKS.forEach(d => {
+      if (results.length >= MAX) return;
+      if (d.name.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q) || (d.dork && d.dork.toLowerCase().includes(q))) {
+        push({
+          section: 'Dorking Engine', sectionIcon: '🔍',
+          icon: '🔍', iconBg: '#1a1a2a', iconColor: 'var(--info-bright)',
+          title: d.name, subtitle: (d.desc || '').substring(0, 80),
+          action: function() { navigateTo('cpc'); switchCPCTab('dorking'); },
+          sectionBadge: 'Dork', badgeColor: 'var(--info-bright)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  8. DORK CATEGORIES
+  // ═══════════════════════════════════════════════
+  if (typeof DORK_CATEGORIES !== 'undefined') {
+    DORK_CATEGORIES.forEach(c => {
+      if (results.length >= MAX) return;
+      if (c.name.toLowerCase().includes(q) || c.desc.toLowerCase().includes(q)) {
+        push({
+          section: 'Dorking · Categorías', sectionIcon: '📂',
+          icon: c.icon || '📂', iconBg: '#1a1a2a', iconColor: 'var(--accent)',
+          title: c.name, subtitle: (c.desc || '').substring(0, 80),
+          action: function() { navigateTo('cpc'); switchCPCTab('dorking'); },
+          sectionBadge: 'Categoría', badgeColor: 'var(--accent)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  9. COTIZADOR — Servicios Instagram
+  // ═══════════════════════════════════════════════
+  if (typeof SERVICES !== 'undefined') {
+    SERVICES.forEach(s => {
+      if (results.length >= MAX) return;
+      if (s.name.toLowerCase().includes(q) || s.detail.toLowerCase().includes(q) || s.cat.toLowerCase().includes(q) || s.subcat.toLowerCase().includes(q)) {
+        push({
+          section: 'Cotizador · Servicios', sectionIcon: '💰',
+          icon: '📦', iconBg: '#0a2a1a', iconColor: '#2ecc71',
+          title: s.name + ' (' + s.cat + ')', subtitle: s.detail + ' · $' + s.price + '/unidad',
+          action: function() { navigateTo('cotizador'); },
+          sectionBadge: 'Servicio', badgeColor: 'var(--success-bright)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  10. RECOVERY STREAMS — Plataformas de regalías
+  // ═══════════════════════════════════════════════
+  if (typeof RECOVERY_STREAMS !== 'undefined') {
+    RECOVERY_STREAMS.forEach(r => {
+      if (results.length >= MAX) return;
+      if (r.name.toLowerCase().includes(q) || r.description.toLowerCase().includes(q) || (r.action && r.action.toLowerCase().includes(q))) {
+        push({
+          section: 'Recuperación de Regalías', sectionIcon: '💎',
+          icon: r.icon, iconBg: r.iconBg || '#1a1a2a', iconColor: r.iconColor || '#c9a96e',
+          title: r.name, subtitle: (r.range || r.estimated ? '💰 ' + (r.range || '$' + r.estimated) : (r.description || '').substring(0, 80)),
+          action: function() { navigateTo('dashboard'); document.getElementById('dash-recovery-card')?.scrollIntoView({behavior:'smooth'}); },
+          sectionBadge: 'Regalías', badgeColor: 'var(--accent)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  11. FUGITIVE SONGS — 12 capitanes auditadas
+  // ═══════════════════════════════════════════════
+  if (typeof FUGITIVE_SONGS !== 'undefined') {
+    FUGITIVE_SONGS.forEach(s => {
+      if (results.length >= MAX) return;
+      if (s.name.toLowerCase().includes(q)) {
+        push({
+          section: 'Contador Fugitivo', sectionIcon: '🔴',
+          icon: '🎵', iconBg: '#2a1a1a', iconColor: '#e05c5c',
+          title: s.name, subtitle: s.nodes + ' nodos · ' + formatViewsShort(s.views) + ' vistas · $' + s.yield.toLocaleString('en-US') + '/mes',
+          action: function() { navigateTo('dashboard'); },
+          sectionBadge: 'Auditada', badgeColor: 'var(--danger)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  12. SCANNER NICHES — Nichos del Viral Scanner
+  // ═══════════════════════════════════════════════
+  if (typeof SCANNER_NICHES !== 'undefined') {
+    SCANNER_NICHES.forEach(n => {
+      if (results.length >= MAX) return;
+      if (n.name.toLowerCase().includes(q) || (n.keywords && n.keywords.toLowerCase().includes(q))) {
+        push({
+          section: 'Viral Scanner · Nichos', sectionIcon: '🤖',
+          icon: '🎯', iconBg: '#2a1a1a', iconColor: n.color || '#e05c5c',
+          title: n.name, subtitle: (n.keywords || '').substring(0, 80),
+          action: function() { navigateTo('cpc'); switchCPCTab('scanner'); },
+          sectionBadge: 'Scanner', badgeColor: 'var(--danger)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  13. SOURCES — Fuentes del Viral Scanner
+  // ═══════════════════════════════════════════════
+  if (typeof SOURCES !== 'undefined') {
+    SOURCES.forEach(s => {
+      if (results.length >= MAX) return;
+      if (s.name.toLowerCase().includes(q) || (s.desc && s.desc.toLowerCase().includes(q))) {
+        push({
+          section: 'Viral Scanner · Fuentes', sectionIcon: '📡',
+          icon: s.icon || '📡', iconBg: '#1a1a2a', iconColor: s.color || 'var(--info)',
+          title: s.name, subtitle: s.desc || '',
+          action: function() { navigateTo('cpc'); switchCPCTab('scanner'); },
+          sectionBadge: 'Fuente', badgeColor: 'var(--info-bright)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  14. VIRAL PATTERNS — Patrones virales OSINT
+  // ═══════════════════════════════════════════════
+  if (typeof VIRAL_PATTERNS !== 'undefined') {
+    VIRAL_PATTERNS.forEach(p => {
+      if (results.length >= MAX) return;
+      if ((p.title && p.title.toLowerCase().includes(q)) || (p.desc && p.desc.toLowerCase().includes(q)) || (p.pattern && p.pattern.toLowerCase().includes(q))) {
+        push({
+          section: 'OSINT · Patrones Virales', sectionIcon: '🕵️',
+          icon: '🔥', iconBg: '#1a1a2a', iconColor: 'var(--purple-bright)',
+          title: p.title || p.pattern || '', subtitle: (p.desc || '').substring(0, 80),
+          action: function() { navigateTo('cpc'); switchCPCTab('osint'); },
+          sectionBadge: 'Patrón', badgeColor: 'var(--purple-bright)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  15. TRENDING GENRES
+  // ═══════════════════════════════════════════════
+  if (typeof TRENDING_GENRES !== 'undefined') {
+    TRENDING_GENRES.forEach(g => {
+      if (results.length >= MAX) return;
+      if (g.label.toLowerCase().includes(q)) {
+        push({
+          section: 'Trending Shorts · Géneros', sectionIcon: '🔥',
+          icon: g.icon || '🔥', iconBg: '#2a1a1a', iconColor: 'var(--danger)',
+          title: g.label, subtitle: 'Filtrar Shorts virales por género',
+          action: function() { navigateTo('dashboard'); fetchTrendingByGenre(g.id); },
+          sectionBadge: 'Trending', badgeColor: 'var(--danger)'
+        });
+      }
+    });
+  }
+
+  // ═══════════════════════════════════════════════
+  //  16. NODE AUDITOR — Shorts y audios
+  // ═══════════════════════════════════════════════
+  const nodeItems = [
+    { name: 'Node Auditor', desc: 'Auditoría Forense de Nodos Musicales', icon: '🕸️', color: 'var(--info-bright)' },
+    { name: 'Shorts Auditor', desc: 'Auditar Shorts de YouTube por canción', icon: '📱', color: 'var(--danger)' },
+    { name: 'Audio Auditor', desc: 'Auditar audios de YouTube por canción', icon: '🎧', color: 'var(--accent)' },
   ];
-  toolsItems.forEach(t => {
-    if (results.length >= 40) return;
-    if (t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)) {
-      results.push({
-        section: 'Herramientas',
-        sectionIcon: '🛠️',
-        icon: t.icon,
-        iconBg: '#1a1a2a',
-        iconColor: '#5c8ce0',
-        title: t.name,
-        subtitle: t.desc,
-        action: function() { navigateTo('tools'); },
-        sectionBadge: 'Tool',
-        badgeColor: 'var(--info)'
+  nodeItems.forEach(n => {
+    if (results.length >= MAX) return;
+    if (n.name.toLowerCase().includes(q) || n.desc.toLowerCase().includes(q)) {
+      push({
+        section: 'Node Auditor', sectionIcon: '🕸️',
+        icon: n.icon, iconBg: '#1a1a2a', iconColor: n.color,
+        title: n.name, subtitle: n.desc,
+        action: function() { navigateTo('nodeauditor'); },
+        sectionBadge: 'Nodo', badgeColor: 'var(--info-bright)'
       });
     }
   });
 
-  // ── Store actions in global array to preserve closure context ──
-  if (!window._usActions) window._usActions = [];
-  window._usActions.length = 0;
-
-  // ── Render dropdown ──
+  // ═══════════════════════════════════════════════
+  //  Render dropdown
+  // ═══════════════════════════════════════════════
   if (!dropdown) return;
 
   if (results.length === 0) {
@@ -1595,16 +1760,15 @@ function universalSearch(query) {
 
   let html = '';
   const sectionKeys = Object.keys(groups);
-  sectionKeys.forEach((s, si) => {
+  sectionKeys.forEach((s) => {
     const group = groups[s];
     html += '<div class="us-dropdown-group">';
     html += '<div class="us-group-label">' + group.icon + ' ' + s + ' (' + group.items.length + ')</div>';
     group.items.forEach(r => {
-      // Highlight matching text
       const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
       const hlTitle = r.title.replace(re, '<span class="us-highlight">$1</span>');
       const hlSub = r.subtitle.replace(re, '<span class="us-highlight">$1</span>');
-            const actionIdx = window._usActions.length;
+      const actionIdx = window._usActions.length;
       window._usActions.push(r.action);
       html += '<div class="us-result-item" onclick="closeUniversalSearch();window._usActions[' + actionIdx + ']()">';
       html += '  <div class="us-result-icon" style="background:' + r.iconBg + ';color:' + r.iconColor + ';">' + r.icon + '</div>';
@@ -1618,11 +1782,12 @@ function universalSearch(query) {
     html += '</div>';
   });
 
-  html += '<div style="padding:6px 12px;font-size:9px;color:var(--muted2);text-align:center;border-top:0.5px solid var(--border);">' + results.length + ' resultado' + (results.length !== 1 ? 's' : '') + ' · Presiona Escape para cerrar</div>';
+  html += '<div style="padding:6px 12px;font-size:9px;color:var(--muted2);text-align:center;border-top:0.5px solid var(--border);">🔎 ' + results.length + ' resultado' + (results.length !== 1 ? 's' : '') + ' de 16 fuentes · Presiona Escape para cerrar</div>';
 
   dropdown.innerHTML = html;
   dropdown.classList.add('open');
 }
+
 
 function closeUniversalSearch() {
   const dropdown = document.getElementById('us-dropdown');

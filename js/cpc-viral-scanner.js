@@ -22,7 +22,24 @@ let scannerState = {
   refreshInterval: null,
   sortBy: 'relevance',
   dateRange: '7d',
+  sourceFilter: 'all',
+  enabledSources: JSON.parse(localStorage.getItem('na_enabled_sources') || '{}'),
 };
+
+// Ensure all SOURCES have an entry in enabledSources (default true)
+function initEnabledSources() {
+  const s = scannerState.enabledSources;
+  const allIds = SOURCES.map(x => x.id);
+  let changed = false;
+  allIds.forEach(id => {
+    if (s[id] === undefined) { s[id] = true; changed = true; }
+  });
+  // Remove stale entries
+  Object.keys(s).forEach(k => {
+    if (!allIds.includes(k)) { delete s[k]; changed = true; }
+  });
+  if (changed) localStorage.setItem('na_enabled_sources', JSON.stringify(s));
+}
 
 /* ── Scanner Niches (subset of CPC niches for scanning) ── */
 const SCANNER_NICHES = [
@@ -56,7 +73,13 @@ const SOURCES = [
   { id: 'tiktok', name: 'TikTok', icon: '🎵', color: '#000000', desc: 'Videos virales en TikTok por nicho' },
   { id: 'pinterest', name: 'Pinterest', icon: '📌', color: '#e60023', desc: 'Pines virales y tendencias en Pinterest' },
   { id: 'instagram', name: 'Instagram Reels', icon: '📱', color: '#e1306c', desc: 'Reels virales en Instagram por nicho' },
+  { id: 'linkedin', name: 'LinkedIn', icon: '💼', color: '#0A66C2', desc: 'Posts virales y tendencias en LinkedIn' },
+  { id: 'quora', name: 'Quora', icon: '💭', color: '#b92b27', desc: 'Preguntas y respuestas virales en Quora por nicho' },
+  { id: 'medium', name: 'Medium', icon: '📖', color: '#000000', desc: 'Artículos y publicaciones virales en Medium por nicho' },
 ];
+
+// Initialize enabledSources defaults (must be after SOURCES is defined)
+initEnabledSources();
 
 /* ══════════════════════════════════════════════
    MAIN RENDER FUNCTION
@@ -86,7 +109,14 @@ function renderViralScanner() {
           ${scannerState.liveMode ? '🔴 Live Mode' : '⚪ Demo Mode'}
         </button>
         <button class="btn btn-sm btn-ghost" onclick="toggleAutoRefresh()" style="font-size:10px;" id="scanner-refresh-btn">🔄 Auto</button>
-        <button class="btn btn-sm btn-ghost" onclick="exportScannerResults()" style="font-size:10px;">📥 Export</button>
+        <div style="position:relative;display:inline-block;" id="scanner-export-wrapper">
+          <button class="btn btn-sm btn-ghost" onclick="toggleScannerExportMenu()" style="font-size:10px;" id="scanner-export-btn">📥 Export ▾</button>
+          <div id="scanner-export-menu" style="display:none;position:absolute;top:100%;right:0;background:var(--bg3);border:0.5px solid var(--border);border-radius:8px;padding:4px;z-index:100;min-width:130px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+            <button class="btn btn-sm btn-ghost" onclick="exportScannerResults('txt')" style="font-size:10px;width:100%;justify-content:flex-start;padding:6px 10px;">📄 Exportar como TXT</button>
+            <button class="btn btn-sm btn-ghost" onclick="exportScannerResults('csv')" style="font-size:10px;width:100%;justify-content:flex-start;padding:6px 10px;">📊 Exportar como CSV</button>
+            <button class="btn btn-sm btn-ghost" onclick="exportScannerResults('json')" style="font-size:10px;width:100%;justify-content:flex-start;padding:6px 10px;">📋 Exportar como JSON</button>
+          </div>
+        </div>
         <button class="btn btn-sm btn-ghost" onclick="showScannerHistory()" style="font-size:10px;">📋 Historial (${totalScans})</button>
       </div>
     </div>
@@ -116,6 +146,9 @@ function renderViralScanner() {
             <option value="tiktok">🎵 TikTok</option>
             <option value="pinterest">📌 Pinterest</option>
             <option value="instagram">📱 Instagram Reels</option>
+            <option value="linkedin">💼 LinkedIn</option>
+            <option value="quora">💭 Quora</option>
+            <option value="medium">📖 Medium</option>
           </select>
         </div>
         <div style="min-width:100px;">
@@ -160,18 +193,57 @@ function renderViralScanner() {
       </div>
     </div>
 
+    <!-- ═══ SOURCE TOGGLES CONTROL BAR ═══ -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:500;color:var(--text2);display:flex;align-items:center;gap:6px;">
+        🔌 Activar fuentes
+        <span style="font-size:9px;color:var(--muted2);font-weight:400;">(marca las que quieras escanear)</span>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-xs btn-ghost" onclick="selectAllSources(true)" style="font-size:9px;padding:3px 10px;">✅ Todas</button>
+        <button class="btn btn-xs btn-ghost" onclick="selectAllSources(false)" style="font-size:9px;padding:3px 10px;">⏸️ Ninguna</button>
+      </div>
+    </div>
+
     <!-- ═══ SOURCE STATUS ═══ -->
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px;" id="scanner-source-status">
       ${SOURCES.map(s => `
-        <div class="scanner-source-card" id="scanner-source-${s.id}" onclick="scanSource('${s.id}')">
-          <div style="font-size:20px;margin-bottom:2px;">${s.icon}</div>
+        <div class="scanner-source-card" id="scanner-source-${s.id}" onclick="filterBySource('${s.id}')" style="cursor:pointer;position:relative;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div style="font-size:20px;margin-bottom:2px;">${s.icon}</div>
+            <label onclick="event.stopPropagation()" title="${scannerState.enabledSources[s.id] ? 'Desactivar' : 'Activar'} ${s.name}"
+              style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:9px;color:var(--muted2);user-select:none;">
+              <input type="checkbox" id="toggle-source-${s.id}"
+                onchange="toggleSource('${s.id}', this.checked)"
+                ${scannerState.enabledSources[s.id] ? 'checked' : ''}
+                style="width:14px;height:14px;cursor:pointer;accent-color:${s.color};" />
+              <span style="font-size:8px;">Activa</span>
+            </label>
+          </div>
           <div style="font-size:10px;font-weight:500;color:var(--text2);">${s.name}</div>
           <div style="font-size:8px;color:var(--muted2);margin-bottom:4px;">${s.desc}</div>
           <div style="font-size:9px;">
             <span id="scanner-source-${s.id}-status" style="color:var(--muted2);">⏸️ Inactivo</span>
           </div>
+          ${!scannerState.enabledSources[s.id] ? '<div class="source-disabled-overlay" style="position:absolute;inset:0;background:rgba(0,0,0,0.35);border-radius:8px;z-index:2;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);">⏸️ Desactivada</div>' : ''}
         </div>
       `).join('')}
+    </div>
+
+    <!-- ═══ SOURCE COMPARISON CHART ═══ -->
+    <div id="scanner-comparison-container" style="${totalResults > 0 ? '' : 'display:none;'}margin-bottom:14px;">
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius2);overflow:hidden;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:0.5px solid var(--border);cursor:pointer;" onclick="toggleScannerComparison()">
+          <div style="font-size:12px;font-weight:500;color:var(--text2);display:flex;align-items:center;gap:6px;">
+            📊 Comparativa por Fuente
+            <span id="scanner-comparison-arrow" style="font-size:10px;color:var(--muted2);transition:transform 0.2s;">▾</span>
+          </div>
+          <span style="font-size:9px;color:var(--muted2);">Resultados · Alto Score · Promedio Viral</span>
+        </div>
+        <div id="scanner-comparison-body" style="padding:12px 14px;">
+          <div id="scanner-comparison-content"></div>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ SCAN PROGRESS ═══ -->
@@ -288,10 +360,23 @@ async function startScannerScan() {
     if (!niche) { throw new Error('Nicho no encontrado'); }
 
     scannerState.scanResults = [];
+    scannerState.sourceFilter = 'all';
     const results = [];
-    const sourcesToScan = scannerState.activeSource === 'all' 
-      ? ['google-news', 'google-discover', 'reddit', 'youtube', 'twitter', 'tiktok', 'pinterest', 'instagram']
+    const allSources = ['google-news', 'google-discover', 'reddit', 'youtube', 'twitter', 'tiktok', 'pinterest', 'instagram', 'linkedin', 'quora', 'medium'];
+    let sourcesToScan = scannerState.activeSource === 'all' 
+      ? allSources.filter(sid => scannerState.enabledSources[sid] !== false)
       : [scannerState.activeSource];
+    
+    // If no sources enabled, show warning
+    if (sourcesToScan.length === 0) {
+      showScannerToast('⚠️ No hay fuentes activadas. Activa al menos una fuente en los toggles superiores.');
+      scannerState.isScanning = false;
+      const btn = document.getElementById('scanner-scan-btn');
+      if (btn) { btn.textContent = '🚀 Escanear'; btn.disabled = false; }
+      const progress = document.getElementById('scanner-progress');
+      if (progress) progress.style.display = 'none';
+      return;
+    }
 
     sourcesToScan.forEach(sid => {
       const statusEl = document.getElementById(`scanner-source-${sid}-status`);
@@ -357,6 +442,7 @@ async function startScannerScan() {
 
     reRenderStats();
     renderScannerResults();
+    renderScannerSourceComparison();
     showScannerToast(`✅ ${scannerState.scanResults.length} posts virales detectados en ${niche.name}`);
 
     if (scannerState.autoRefresh) {
@@ -513,6 +599,51 @@ async function scanSourceLive(sourceId, niche) {
         return parseInstagramData(text, niche);
       } catch (e) {
         throw new Error('Instagram feed no disponible');
+      }
+    }
+
+        case 'linkedin': {
+      const searchQuery = niche.keywords.split(' OR ')[0];
+      // LinkedIn no tiene API pública. Intentamos con RSS de LinkedIn Pulse.
+      // Modo LIVE intenta fetch, si falla usa fallback automático a demo data.
+      const linkedinUrl = `https://www.linkedin.com/feed/trending.rss?q=${encodeURIComponent(searchQuery)}`;
+      try {
+        const proxyUrl = CORS_PROXIES[0] + encodeURIComponent(linkedinUrl);
+        const response = await fetchWithTimeout(proxyUrl, 6000);
+        const text = await response.text();
+        return parseLinkedInRSS(text, niche);
+      } catch (e) {
+        throw new Error('LinkedIn feed no disponible');
+      }
+    }
+
+    case 'quora': {
+      const searchQuery = niche.keywords.split(' OR ')[0];
+      // Quora RSS feed por topic/search. Quora expone RSS para topics.
+      const quoraUrl = `https://www.quora.com/search/rss?q=${encodeURIComponent(searchQuery)}`;
+      try {
+        const proxyUrl = CORS_PROXIES[0] + encodeURIComponent(quoraUrl);
+        const response = await fetchWithTimeout(proxyUrl, 6000);
+        const text = await response.text();
+        return parseQuoraRSS(text, niche);
+      } catch (e) {
+        throw new Error('Quora feed no disponible');
+      }
+    }
+
+    case 'medium': {
+      const searchQuery = niche.keywords.split(' OR ')[0];
+      // Medium RSS feed por tag. Medium expone RSS público: medium.com/feed/tag/{tag}
+      // También soporta topics/publicaciones: medium.com/feed/{topic}
+      const tag = searchQuery.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'trending';
+      const mediumUrl = `https://medium.com/feed/tag/${encodeURIComponent(tag)}`;
+      try {
+        const proxyUrl = CORS_PROXIES[0] + encodeURIComponent(mediumUrl);
+        const response = await fetchWithTimeout(proxyUrl, 6000);
+        const text = await response.text();
+        return parseMediumRSS(text, niche);
+      } catch (e) {
+        throw new Error('Medium feed no disponible');
       }
     }
 
@@ -831,6 +962,117 @@ function parseInstagramData(jsonText, niche) {
   return results;
 }
 
+/* ── Medium RSS Parser ── */
+function parseMediumRSS(xmlText, niche) {
+  const results = [];
+  const titleRegex = /<title[^>]*>([^<]+)<\/title>/g;
+  const linkRegex = /<link[^>]*>([^<]+)<\/link>/g;
+  const pubDateRegex = /<pubDate[^>]*>([^<]+)<\/pubDate>/g;
+  const creatorRegex = /<dc:creator[^>]*>([^<]+)<\/dc:creator>/g;
+  const categoryRegex = /<category[^>]*>([^<]+)<\/category>/g;
+
+  const titles = [...xmlText.matchAll(titleRegex)].map(m => m[1]).slice(1);
+  const links = [...xmlText.matchAll(linkRegex)].map(m => m[1]).slice(1);
+  const pubDates = [...xmlText.matchAll(pubDateRegex)].map(m => m[1]);
+  const creators = [...xmlText.matchAll(creatorRegex)].map(m => m[1]);
+  const categories = [...xmlText.matchAll(categoryRegex)].map(m => m[1]);
+
+  for (let i = 0; i < Math.min(titles.length, 15); i++) {
+    const title = titles[i]?.trim();
+    if (!title || title === 'Medium') continue;
+    const creator = creators[i] || 'Autor Medium';
+    const cats = categories.filter((c, ci) => ci >= i * 3 && ci < (i + 1) * 3).join(', ') || niche.name;
+    results.push({
+      title,
+      url: links[i] || '#',
+      source: 'medium',
+      sourceName: 'Medium',
+      sourceIcon: '📖',
+      publishedAt: pubDates[i] ? new Date(pubDates[i]).toISOString() : new Date().toISOString(),
+      snippet: title,
+      niche: niche.id,
+      nicheName: niche.name,
+      engagement: Math.floor(Math.random() * 500) + 30,
+      sourceDetail: `📖 by ${creator} · ${cats}`,
+    });
+  }
+
+  if (results.length < 2) {
+    throw new Error('Medium returned insufficient results');
+  }
+  return results;
+}
+
+/* ── Quora RSS Parser ── */
+function parseQuoraRSS(xmlText, niche) {
+  const results = [];
+  const titleRegex = /<title[^>]*>([^<]+)<\/title>/g;
+  const linkRegex = /<link[^>]*>([^<]+)<\/link>/g;
+  const pubDateRegex = /<pubDate[^>]*>([^<]+)<\/pubDate>/g;
+
+  const titles = [...xmlText.matchAll(titleRegex)].map(m => m[1]).slice(1);
+  const links = [...xmlText.matchAll(linkRegex)].map(m => m[1]).slice(1);
+  const pubDates = [...xmlText.matchAll(pubDateRegex)].map(m => m[1]);
+
+  for (let i = 0; i < Math.min(titles.length, 15); i++) {
+    const title = titles[i]?.trim();
+    if (!title || title === 'Quora' || title === 'Search - Quora') continue;
+    results.push({
+      title,
+      url: links[i] || '#',
+      source: 'quora',
+      sourceName: 'Quora',
+      sourceIcon: '💭',
+      publishedAt: pubDates[i] ? new Date(pubDates[i]).toISOString() : new Date().toISOString(),
+      snippet: title,
+      niche: niche.id,
+      nicheName: niche.name,
+      engagement: Math.floor(Math.random() * 300) + 20,
+      sourceDetail: '💭 Quora RSS feed',
+    });
+  }
+
+  if (results.length < 2) {
+    throw new Error('Quora returned insufficient results');
+  }
+  return results;
+}
+
+/* ── LinkedIn RSS Parser ── */
+function parseLinkedInRSS(xmlText, niche) {
+  const results = [];
+  const titleRegex = /<title[^>]*>([^<]+)<\/title>/g;
+  const linkRegex = /<link[^>]*>([^<]+)<\/link>/g;
+  const pubDateRegex = /<pubDate[^>]*>([^<]+)<\/pubDate>/g;
+
+  const titles = [...xmlText.matchAll(titleRegex)].map(m => m[1]).slice(1);
+  const links = [...xmlText.matchAll(linkRegex)].map(m => m[1]).slice(1);
+  const pubDates = [...xmlText.matchAll(pubDateRegex)].map(m => m[1]);
+
+  for (let i = 0; i < Math.min(titles.length, 15); i++) {
+    const title = titles[i]?.trim();
+    if (!title) continue;
+    results.push({
+      title,
+      url: links[i] || '#',
+      source: 'linkedin',
+      sourceName: 'LinkedIn',
+      sourceIcon: '💼',
+      publishedAt: pubDates[i] ? new Date(pubDates[i]).toISOString() : new Date().toISOString(),
+      snippet: title,
+      niche: niche.id,
+      nicheName: niche.name,
+      engagement: Math.floor(Math.random() * 3000) + 50,
+      sourceDetail: '💼 LinkedIn Pulse feed',
+    });
+  }
+
+  if (results.length < 2) {
+    throw new Error('LinkedIn returned insufficient results');
+  }
+  return results;
+}
+
 /* ══════════════════════════════════════════════
    DEMO SCANNER — Generates realistic fake data
    ══════════════════════════════════════════════ */
@@ -979,6 +1221,57 @@ function scanSourceDemo(sourceId, niche) {
       `IG exclusive: The ${niche.name} strategy no one shares 🤐🔥`,
       `📱 This ${niche.name} Reel went viral for a reason — watch until end 👀`,
     ],
+    'medium': [
+      `The Future of ${niche.name}: Trends Shaping the Industry in 2026`,
+      `Why ${niche.name} Matters More Than Ever — A Deep Dive Analysis`,
+      `How I Built a Successful ${niche.name} Strategy from Scratch`,
+      `The Ultimate Guide to ${niche.name} for Beginners (2026 Edition)`,
+      `${niche.name} vs. The Competition: Which One Should You Choose?`,
+      `10 ${niche.name} Lessons I Learned After 5 Years in the Industry`,
+      `The ${niche.name} Revolution: What’s Changing and Why You Should Care`,
+      `Why Most ${niche.name} Strategies Fail and How to Avoid Common Pitfalls`,
+      `${niche.name} Best Practices: Lessons from Top Professionals`,
+      `The Complete ${niche.name} Handbook: Everything You Need to Know`,
+      `How ${niche.name} Is Being Transformed by AI and New Technologies`,
+      `Why I Switched to ${niche.name} and Never Looked Back`,
+      `${niche.name}: The Untold Story Behind the Industry’s Biggest Shift`,
+      `A Beginner’s Guide to ${niche.name} — What I Wish Someone Had Told Me`,
+      `The ${niche.name} Stack: Tools, Tips, and Techniques for Success`,
+    ],
+    'quora': [
+      `What Is the Best ${niche.name} Strategy for 2026? Experts Weigh In`,
+      `${niche.name}: The Complete Guide to Getting Started — Quora Answers`,
+      `What Are the Biggest ${niche.name} Myths That People Still Believe?`,
+      `How Much Does ${niche.name} Actually Cost? Real Answers from Professionals`,
+      `What ${niche.name} Skills Are Most in Demand Right Now?`,
+      `Is ${niche.name} Worth It in 2026? Honest Review from Industry Insiders`,
+      `What Nobody Tells You About ${niche.name} — Quora Thread`,
+      `What Are the Best ${niche.name} Resources for Self-Learning?`,
+      `${niche.name} vs Traditional Approaches: Which Is Better? — Quora Discussion`,
+      `How to Transition Into ${niche.name} Career: Step-by-Step Guide`,
+      `What ${niche.name} Trends Will Dominate the Next 5 Years?`,
+      `Former ${niche.name} Professional Shares Insider Secrets`,
+      `What Are the Most Common ${niche.name} Scams to Avoid?`,
+      `How I Made My First $10K in ${niche.name} — Quora Success Story`,
+      `What ${niche.name} Certification Is Actually Worth Getting?`,
+    ],
+    'linkedin': [
+      `${niche.name} Industry Insights: What Top Professionals Are Saying in 2026 💼`,
+      `How ${niche.name} Is Transforming the Way We Do Business 🔥`,
+      `I spent 10 years in ${niche.name} — here are my top 5 lessons 🧠`,
+      `The Future of ${niche.name}: Trends Every Professional Should Know 📈`,
+      `${niche.name} Expert Shares Game-Changing Strategy That Actually Works ✅`,
+      `Why ${niche.name} Is the Most Underrated Skill in Today's Market 💡`,
+      `Breaking Down the Latest ${niche.name} News — What It Means for You 📊`,
+      `How I Built a Successful Career in ${niche.name} (Full Story) 🚀`,
+      `${niche.name} Certification Guide: Which One Is Worth Your Time 🎓`,
+      `The ${niche.name} Debate: Industry Leaders Weigh In 🗣️`,
+      `Soft Skills vs Hard Skills in ${niche.name} — What Matters More? ⚖️`,
+      `${niche.name} Networking Tips That Landed Me My Dream Job 🤝`,
+      `New Research on ${niche.name} That Changes Everything 🔬`,
+      `5 ${niche.name} Mistakes That Could Cost You Your Reputation ⚠️`,
+      `The ${niche.name} Community Is Growing — Here's How to Get Involved 🌐`,
+    ],
   };
 
   const titles = demoTitles[sourceId] || demoTitles['google-news'];
@@ -991,6 +1284,9 @@ function scanSourceDemo(sourceId, niche) {
     'tiktok': { name: 'TikTok', icon: '🎵' },
     'pinterest': { name: 'Pinterest', icon: '📌' },
     'instagram': { name: 'Instagram Reels', icon: '📱' },
+    'linkedin': { name: 'LinkedIn', icon: '💼' },
+    'quora': { name: 'Quora', icon: '💭' },
+    'medium': { name: 'Medium', icon: '📖' },
   };
   const src = sources[sourceId] || sources['google-news'];
 
@@ -1025,6 +1321,17 @@ function scanSourceDemo(sourceId, niche) {
     } else if (sourceId === 'instagram') {
       engagement = Math.floor(Math.random() * 80000) + 500;
       sourceDetail = `📱 ${Math.floor(Math.random() * 200) + 5}K views · ${Math.floor(Math.random() * 10) + 1}K likes · ${Math.floor(Math.random() * 500) + 10} comments`;
+    } else if (sourceId === 'medium') {
+      engagement = Math.floor(Math.random() * 8000) + 100;
+      const claps = Math.floor(Math.random() * 5000) + 50;
+      const reads = Math.floor(Math.random() * 2000) + 20;
+      sourceDetail = `📖 ${claps} claps · ${reads} reads · ${Math.floor(Math.random() * 100) + 5} responses`;
+    } else if (sourceId === 'quora') {
+      engagement = Math.floor(Math.random() * 3000) + 30;
+      sourceDetail = `💭 ${Math.floor(Math.random() * 500) + 10} upvotes · ${Math.floor(Math.random() * 100) + 5} answers · ${Math.floor(Math.random() * 200) + 5} shares`;
+    } else if (sourceId === 'linkedin') {
+      engagement = Math.floor(Math.random() * 5000) + 50;
+      sourceDetail = `💼 ${Math.floor(Math.random() * 1000) + 10} reactions · ${Math.floor(Math.random() * 200) + 5} comments · ${Math.floor(Math.random() * 50) + 1} reposts`;
     }
     results.push({
       title,
@@ -1086,6 +1393,7 @@ function calculateViralScore(result) {
   else if (result.source === 'tiktok') score += 12;
   else if (result.source === 'instagram') score += 11;
   else if (result.source === 'reddit') score += 10;
+  else if (result.source === 'linkedin') score += 6;
   else if (result.source === 'twitter') score += 8;
   else if (result.source === 'pinterest') score += 7;
   else if (result.source === 'google-news') score += 5;
@@ -1095,6 +1403,29 @@ function calculateViralScore(result) {
   else if (hoursAgo < 24) score += 10;
 
   return Math.min(99, Math.max(1, score));
+}
+
+/* ══════════════════════════════════════════════
+   SOURCE FILTER — Filtra resultados existentes sin re-escanear
+   ══════════════════════════════════════════════ */
+
+function filterBySource(sourceId) {
+  // Toggle: si ya está activo, limpiar filtro (mostrar todas)
+  if (scannerState.sourceFilter === sourceId) {
+    scannerState.sourceFilter = 'all';
+  } else {
+    scannerState.sourceFilter = sourceId;
+  }
+  renderScannerResults();
+  reRenderStats();
+  
+  // Mostrar toast informativo
+  const source = SOURCES.find(s => s.id === scannerState.sourceFilter);
+  if (source) {
+    showScannerToast(`🔍 Mostrando solo resultados de ${source.icon} ${source.name}`);
+  } else if (scannerState.sourceFilter === 'all') {
+    showScannerToast('📊 Mostrando todas las fuentes');
+  }
 }
 
 /* ══════════════════════════════════════════════
@@ -1108,7 +1439,11 @@ function renderScannerResults() {
 
   let results = [...scannerState.scanResults];
 
-  if (scannerState.activeSource !== 'all') {
+  // Filter by source filter (sin re-escanear, solo filtra resultados existentes)
+  if (scannerState.sourceFilter !== 'all') {
+    results = results.filter(r => r.source === scannerState.sourceFilter);
+  } else if (scannerState.activeSource !== 'all') {
+    // Si no hay filtro manual pero hay fuente activa del escaneo, usar esa
     results = results.filter(r => r.source === scannerState.activeSource);
   }
 
@@ -1120,6 +1455,7 @@ function renderScannerResults() {
     const q = searchInput.value.toLowerCase().trim();
     results = results.filter(r => 
       r.title.toLowerCase().includes(q) || 
+      r.snippet?.toLowerCase().includes(q) ||
       r.nicheName.toLowerCase().includes(q) ||
       r.sourceName.toLowerCase().includes(q) ||
       r.sourceDetail?.toLowerCase().includes(q)
@@ -1141,11 +1477,21 @@ function renderScannerResults() {
     results.sort((a, b) => b.relevanceScore - a.relevanceScore);
   }
 
-  // Show filtered vs total count
+  // Show filtered vs total count (con información de filtro por fuente)
   if (countEl) {
     const searchInput = document.getElementById('scanner-search-input');
     const hasSearch = searchInput && searchInput.value.trim().length > 0;
-    if (hasSearch) {
+    const hasSourceFilter = scannerState.sourceFilter !== 'all';
+    
+    if (hasSourceFilter) {
+      const src = SOURCES.find(s => s.id === scannerState.sourceFilter);
+      const totalAll = scannerState.scanResults.length;
+      if (hasSearch) {
+        countEl.textContent = `(${results.length} de ${totalBeforeSearch} · ${src ? src.icon : ''} ${src ? src.name : ''})`;
+      } else {
+        countEl.textContent = `(${results.length} de ${totalAll} · ${src ? src.icon : ''} ${src ? src.name : ''})`;
+      }
+    } else if (hasSearch) {
       countEl.textContent = `(${results.length} de ${totalBeforeSearch} resultados)`;
     } else {
       countEl.textContent = `(${results.length} resultados)`;
@@ -1164,7 +1510,7 @@ function renderScannerResults() {
     const timeStr = hoursAgo < 1 ? `${minutesAgo}m ago` : hoursAgo < 24 ? `${hoursAgo}h ago` : `${Math.floor(hoursAgo / 24)}d ago`;
     const viralLabel = r.viralScore >= 80 ? '🔥 Viral' : r.viralScore >= 60 ? '📈 Trending' : r.viralScore >= 40 ? '📊 Rising' : '📋 Normal';
     const viralColor = r.viralScore >= 80 ? 'var(--danger)' : r.viralScore >= 60 ? 'var(--orange-bright)' : r.viralScore >= 40 ? 'var(--info-bright)' : 'var(--muted2)';
-    const sourceColors = { 'google-news': '#4285f4', 'google-discover': '#34a853', 'reddit': '#ff4500', 'youtube': '#ff0000', 'twitter': '#1da1f2', 'tiktok': '#000000', 'pinterest': '#e60023', 'instagram': '#e1306c' };
+    const sourceColors = { 'google-news': '#4285f4', 'google-discover': '#34a853', 'reddit': '#ff4500', 'youtube': '#ff0000', 'twitter': '#1da1f2', 'tiktok': '#000000', 'pinterest': '#e60023', 'instagram': '#e1306c', 'linkedin': '#0A66C2', 'quora': '#b92b27', 'medium': '#000000' };
     const sourceColor = sourceColors[r.source] || '#888';
 
     html += `
@@ -1211,6 +1557,106 @@ function clearScannerSearch() {
 }
 
 /* ══════════════════════════════════════════════
+   SOURCE COMPARISON CHART — Compara rendimiento entre fuentes
+   ══════════════════════════════════════════════ */
+
+function toggleScannerComparison() {
+  const body = document.getElementById('scanner-comparison-body');
+  const arrow = document.getElementById('scanner-comparison-arrow');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (arrow) arrow.style.transform = isOpen ? 'rotate(-90deg)' : '';
+}
+
+function renderScannerSourceComparison() {
+  const container = document.getElementById('scanner-comparison-content');
+  const outerContainer = document.getElementById('scanner-comparison-container');
+  if (!container || !outerContainer) return;
+
+  const results = scannerState.scanResults;
+  if (results.length === 0) {
+    outerContainer.style.display = 'none';
+    return;
+  }
+  outerContainer.style.display = 'block';
+
+  // Aggregate by source
+  const sourceStats = {};
+  results.forEach(r => {
+    if (!sourceStats[r.source]) {
+      const srcMeta = SOURCES.find(s => s.id === r.source) || { color: '#888', icon: '❓', name: r.sourceName };
+      sourceStats[r.source] = {
+        id: r.source,
+        name: r.sourceName,
+        icon: r.sourceIcon,
+        color: srcMeta.color,
+        totalResults: 0,
+        highViralCount: 0,
+        totalEngagement: 0,
+        totalViralScore: 0,
+      };
+    }
+    sourceStats[r.source].totalResults++;
+    sourceStats[r.source].totalEngagement += r.engagement || 0;
+    sourceStats[r.source].totalViralScore += r.viralScore || 0;
+    if (r.viralScore >= 60) {
+      sourceStats[r.source].highViralCount++;
+    }
+  });
+
+  // Calculate averages and sort by total results desc
+  const statsArray = Object.values(sourceStats).map(s => ({
+    ...s,
+    avgViralScore: s.totalResults > 0 ? Math.round(s.totalViralScore / s.totalResults) : 0,
+  })).sort((a, b) => b.totalResults - a.totalResults);
+
+  const maxResults = statsArray.length > 0 ? Math.max(...statsArray.map(s => s.totalResults)) : 1;
+
+  let html = statsArray.map(s => {
+    const barPct = (s.totalResults / maxResults) * 100;
+    const highViralOfTotal = s.totalResults > 0 ? Math.round((s.highViralCount / s.totalResults) * 100) : 0;
+
+    return `
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <div style="width:24px;text-align:center;flex-shrink:0;font-size:14px;">${s.icon}</div>
+        <div style="width:80px;flex-shrink:0;font-size:9px;color:var(--muted2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:2px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="flex:1;height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;">
+              <div style="height:100%;width:${barPct}%;background:linear-gradient(90deg,${s.color},${s.color}cc);border-radius:4px;transition:width 0.6s ease-out;"></div>
+            </div>
+            <span style="font-size:10px;font-weight:600;font-family:var(--mono);color:var(--text2);min-width:24px;text-align:right;">${s.totalResults}</span>
+          </div>
+          <div style="display:flex;gap:8px;font-size:8px;color:var(--muted2);padding-left:2px;">
+            <span>🔥 ${s.highViralCount} alto score (${highViralOfTotal}%)</span>
+            <span>📊 Ø ${s.avgViralScore} viral</span>
+            <span>💬 ${s.totalEngagement.toLocaleString('en-US')} eng.</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Summary row
+  const totalHighViral = statsArray.reduce((a, s) => a + s.highViralCount, 0);
+  const avgViral = results.length > 0 ? Math.round(results.reduce((a, r) => a + (r.viralScore || 0), 0) / results.length) : 0;
+  const totalEng = results.reduce((a, r) => a + (r.engagement || 0), 0);
+
+  html += `
+    <div style="margin-top:10px;padding-top:8px;border-top:0.5px solid var(--border);display:flex;gap:16px;font-size:10px;color:var(--muted2);">
+      <span>📊 <strong style="color:var(--text2);">${results.length}</strong> total resultados</span>
+      <span>🔥 <strong style="color:var(--danger);">${totalHighViral}</strong> alto viral (≥60)</span>
+      <span>📈 <strong style="color:var(--accent);">${avgViral}</strong> score viral promedio</span>
+      <span>💬 <strong style="color:var(--info-bright);">${totalEng.toLocaleString('en-US')}</strong> engagement total</span>
+      <span style="font-size:8px;color:var(--muted2);flex:1;text-align:right;">Barras = total resultados · ≥60 = alto viral</span>
+    </div>
+  `;
+
+  container.innerHTML = html;
+}
+
+/* ══════════════════════════════════════════════
    RE-RENDER STATS
    ══════════════════════════════════════════════ */
 
@@ -1230,6 +1676,17 @@ function reRenderStats() {
       const count = sources[s.id] || 0;
       statusEl.innerHTML = count > 0 ? `✅ ${count} resultados` : '⏸️ Inactivo';
     }
+    
+    // Highlight source filter active state
+    const card = document.getElementById(`scanner-source-${s.id}`);
+    if (card) {
+      const isActive = scannerState.sourceFilter === s.id;
+      card.style.borderColor = isActive ? s.color : '';
+      card.style.background = isActive ? `${s.color}12` : '';
+      card.style.boxShadow = isActive ? `0 0 12px ${s.color}30` : '';
+      card.style.transform = isActive ? 'scale(1.03)' : '';
+      card.title = isActive ? `Haz clic para mostrar todas las fuentes` : `Filtrar solo ${s.name}`;
+    }
   });
 }
 
@@ -1237,8 +1694,74 @@ function reRenderStats() {
    SOURCE-SPECIFIC SCAN
    ══════════════════════════════════════════════ */
 
+/* ── Source toggle ── */
+function toggleSource(sourceId, enabled) {
+  scannerState.enabledSources[sourceId] = enabled;
+  localStorage.setItem('na_enabled_sources', JSON.stringify(scannerState.enabledSources));
+  
+  // Update card visual state
+  const card = document.getElementById(`scanner-source-${sourceId}`);
+  if (card) {
+    if (!enabled) {
+      // Add overlay
+      if (!card.querySelector('.source-disabled-overlay')) {
+        const overlay = document.createElement('div');
+        overlay.className = 'source-disabled-overlay';
+        overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.35);border-radius:8px;z-index:2;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);';
+        overlay.textContent = '⏸️ Desactivada';
+        card.style.position = 'relative';
+        card.appendChild(overlay);
+      }
+    } else {
+      const overlay = card.querySelector('.source-disabled-overlay');
+      if (overlay) overlay.remove();
+    }
+  }
+  
+  // Update the checkbox label text
+  const label = document.querySelector(`label[for="toggle-source-${sourceId}"] span`);
+  if (label) label.textContent = enabled ? 'Activa' : 'Inactiva';
+  
+  // Show toast
+  const src = SOURCES.find(s => s.id === sourceId);
+  showScannerToast(enabled 
+    ? `✅ ${src ? src.icon : ''} ${src ? src.name : sourceId} activada para escaneo`
+    : `⏸️ ${src ? src.icon : ''} ${src ? src.name : sourceId} desactivada`);
+}
+
+/* ── Select All / None sources ── */
+function selectAllSources(enabled) {
+  SOURCES.forEach(s => {
+    scannerState.enabledSources[s.id] = enabled;
+    // Update checkbox
+    const cb = document.getElementById(`toggle-source-${s.id}`);
+    if (cb) cb.checked = enabled;
+    // Update card overlay
+    const card = document.getElementById(`scanner-source-${s.id}`);
+    if (card) {
+      if (!enabled) {
+        if (!card.querySelector('.source-disabled-overlay')) {
+          const overlay = document.createElement('div');
+          overlay.className = 'source-disabled-overlay';
+          overlay.style.cssText = 'position:absolute;inset:0;background:rgba(0,0,0,0.35);border-radius:8px;z-index:2;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted);';
+          overlay.textContent = '⏸️ Desactivada';
+          card.style.position = 'relative';
+          card.appendChild(overlay);
+        }
+      } else {
+        const overlay = card.querySelector('.source-disabled-overlay');
+        if (overlay) overlay.remove();
+      }
+    }
+    // Update label text
+    const label = document.querySelector(`label[for="toggle-source-${s.id}"] span`);
+    if (label) label.textContent = enabled ? 'Activa' : 'Inactiva';
+  });
+  localStorage.setItem('na_enabled_sources', JSON.stringify(scannerState.enabledSources));
+  showScannerToast(enabled ? '✅ Todas las fuentes activadas' : '⏸️ Todas las fuentes desactivadas');
+}
+
 function scanSource(sourceId) {
-  scannerState.activeSource = sourceId;
   const select = document.getElementById('scanner-source-select');
   if (select) select.value = sourceId;
   startScannerScan();
@@ -1369,13 +1892,45 @@ function clearScannerHistory() {
    EXPORT
    ══════════════════════════════════════════════ */
 
-function exportScannerResults() {
+/* ── Export menu toggle ── */
+function toggleScannerExportMenu() {
+  const menu = document.getElementById('scanner-export-menu');
+  if (!menu) return;
+  const isOpen = menu.style.display === 'block';
+  menu.style.display = isOpen ? 'none' : 'block';
+}
+
+// Close export menu on click outside
+document.addEventListener('click', function(e) {
+  const wrapper = document.getElementById('scanner-export-wrapper');
+  const menu = document.getElementById('scanner-export-menu');
+  if (wrapper && menu && !wrapper.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+/* ── Export functions ── */
+function exportScannerResults(format) {
+  // Close the menu
+  const menu = document.getElementById('scanner-export-menu');
+  if (menu) menu.style.display = 'none';
+
   const results = scannerState.scanResults;
   if (results.length === 0) {
     showScannerToast('⚠️ No hay resultados para exportar');
     return;
   }
 
+  if (format === 'csv') {
+    exportScannerCSV(results);
+  } else if (format === 'json') {
+    exportScannerJSON(results);
+  } else {
+    exportScannerTXT(results);
+  }
+}
+
+function exportScannerTXT(results) {
   let text = 'NUCLEAR AIMA — VIRAL SCANNER EXPORT\n';
   text += `Nicho: ${scannerState.activeNiche}\n`;
   text += `Fuente: ${scannerState.activeSource === 'all' ? 'Todas' : scannerState.activeSource}\n`;
@@ -1396,12 +1951,94 @@ function exportScannerResults() {
     text += `    Detalle: ${r.sourceDetail || '—'}\n\n`;
   });
 
-  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  downloadBlob(text, 'text/plain;charset=utf-8', `viral-scan-${scannerState.activeNiche}-${dateStamp()}.txt`);
+  showScannerToast(`📥 ${results.length} resultados exportados como TXT`);
+}
+
+function exportScannerCSV(results) {
+  // BOM for Excel compatibility
+  const BOM = '\uFEFF';
+  const headers = ['#','Título','Fuente','Icono','Nicho','Engagement','Relevancia %','Viral %','Publicado','URL','Detalle','Modo'];
+  
+  const rows = results.map((r, i) => {
+    return [
+      i + 1,
+      `"${(r.title || '').replace(/"/g, '""')}"`,
+      `"${r.sourceName}"`,
+      r.sourceIcon,
+      `"${r.nicheName}"`,
+      r.engagement,
+      r.relevanceScore,
+      r.viralScore,
+      `"${new Date(r.publishedAt).toLocaleString('es-DO')}"`,
+      `"${r.url}"`,
+      `"${(r.sourceDetail || '—').replace(/"/g, '""')}"`,
+      scannerState.liveMode ? 'LIVE' : 'DEMO'
+    ].join(',');
+  });
+
+  const csv = BOM + headers.join(',') + '\n' + rows.join('\n');
+  downloadBlob(csv, 'text/csv;charset=utf-8;', `viral-scan-${scannerState.activeNiche}-${dateStamp()}.csv`);
+  showScannerToast(`📊 ${results.length} resultados exportados como CSV`);
+}
+
+function exportScannerJSON(results) {
+  const exportData = {
+    meta: {
+      tool: 'Nuclear AIMA — Viral Scanner',
+      version: VIRAL_SCANNER_VERSION,
+      niche: scannerState.activeNiche,
+      source: scannerState.activeSource === 'all' ? 'Todas' : scannerState.activeSource,
+      mode: scannerState.liveMode ? 'LIVE' : 'DEMO',
+      totalResults: results.length,
+      exportedAt: new Date().toISOString(),
+    },
+    results: results.map(r => ({
+      index: null, // se asigna abajo
+      title: r.title,
+      source: {
+        id: r.source,
+        name: r.sourceName,
+        icon: r.sourceIcon,
+      },
+      niche: {
+        id: r.niche,
+        name: r.nicheName,
+      },
+      engagement: r.engagement,
+      scores: {
+        relevance: r.relevanceScore,
+        viral: r.viralScore,
+      },
+      publishedAt: r.publishedAt,
+      url: r.url,
+      detail: r.sourceDetail || null,
+      snippet: r.snippet || null,
+    }))
+  };
+
+  // Add index to results
+  exportData.results.forEach((r, i) => { r.index = i + 1; });
+
+  const jsonStr = JSON.stringify(exportData, null, 2);
+  downloadBlob(jsonStr, 'application/json;charset=utf-8;', `viral-scan-${scannerState.activeNiche}-${dateStamp()}.json`);
+  showScannerToast(`📋 ${results.length} resultados exportados como JSON`);
+}
+
+/* ── Download helpers ── */
+function downloadBlob(content, mimeType, filename) {
+  const blob = new Blob([content], { type: mimeType });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `viral-scan-${scannerState.activeNiche}-${new Date().toISOString().split('T')[0]}.txt`;
+  a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  showScannerToast(`📥 ${results.length} resultados exportados`);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function dateStamp() {
+  return new Date().toISOString().split('T')[0];
 }
 
 /* ══════════════════════════════════════════════
@@ -1516,9 +2153,9 @@ function showScannerArchitecture() {
           <div style="padding:10px 12px;border-bottom:0.5px solid var(--border);display:flex;gap:10px;align-items:flex-start;">
             <span style="font-size:16px;flex-shrink:0;">👁️</span>
             <div style="flex:1;">
-              <div style="font-size:11px;font-weight:600;color:var(--info-bright);">2. OBSERVE — Fuentes de Datos (8 fuentes)</div>
+              <div style="font-size:11px;font-weight:600;color:var(--info-bright);">2. OBSERVE — Fuentes de Datos (9 fuentes)</div>
               <div style="font-size:10px;color:var(--muted2);margin-top:2px;">
-                El scanner observa <strong style="color:var(--text2);">8 fuentes</strong> en paralelo:
+                El scanner observa <strong style="color:var(--text2);">11 fuentes</strong> en paralelo:
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;">
                 <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#4285f4;">📰 Google News RSS</div>
@@ -1527,6 +2164,7 @@ function showScannerArchitecture() {
                 <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#000;">🎵 TikTok (RSS)</div>
                 <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#ff0000;">▶️ YouTube RSS</div>
                 <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#e1306c;">📱 Instagram Reels (API)</div>
+                <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#0A66C2;">💼 LinkedIn (Pulse RSS)</div>
                 <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#e60023;">📌 Pinterest (API)</div>
                 <div style="font-size:9px;padding:4px 8px;background:var(--bg4);border-radius:4px;color:#1da1f2;">🐦 X/Twitter (Nitter RSS)</div>
               </div>
@@ -1553,6 +2191,7 @@ function showScannerArchitecture() {
                 • <strong style="color:#000;">🎵 TikTok</strong> → TokFeed RSS (feed de terceros)<br>
                 • <strong style="color:#ff0000;">YouTube</strong> → XML RSS → regex title/link/published<br>
                 • <strong style="color:#e1306c;">📱 Instagram Reels</strong> → GraphQL API (explore/tags)<br>
+                • <strong style="color:#0A66C2;">💼 LinkedIn</strong> → LinkedIn RSS (feed de tendencias)<br>
                 • <strong style="color:#e60023;">📌 Pinterest</strong> → BoardFeedResource API (JSON)<br>
                 • <strong style="color:#1da1f2;">X/Twitter</strong> → Nitter RSS (proxy alternativo)<br>
                 <br>
@@ -1618,7 +2257,7 @@ function showScannerArchitecture() {
 
       <!-- ═══ FUENTES TÉCNICAS ═══ -->
       <div style="margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px;">📡 Las 8 Fuentes — Detalle Técnico</div>
+        <div style="font-size:13px;font-weight:600;color:var(--accent);margin-bottom:6px;">📡 Las 9 Fuentes — Detalle Técnico</div>
         <div style="display:flex;flex-direction:column;gap:4px;">
           <div style="background:var(--bg3);border-radius:var(--radius);padding:8px 10px;font-size:9px;display:flex;justify-content:space-between;align-items:center;">
             <span><strong style="color:#4285f4;">📰 Google News</strong> — news.google.com/rss/search?q=...</span>
@@ -1643,6 +2282,10 @@ function showScannerArchitecture() {
           <div style="background:var(--bg3);border-radius:var(--radius);padding:8px 10px;font-size:9px;display:flex;justify-content:space-between;align-items:center;">
             <span><strong style="color:#e1306c;">📱 Instagram Reels</strong> — instagram.com/explore/tags (GraphQL)</span>
             <span style="color:var(--muted2);font-family:var(--mono);">JSON API</span>
+          </div>
+          <div style="background:var(--bg3);border-radius:var(--radius);padding:8px 10px;font-size:9px;display:flex;justify-content:space-between;align-items:center;">
+            <span><strong style="color:#0A66C2;">💼 LinkedIn</strong> — linkedin.com/feed/trending.rss (Pulse RSS)</span>
+            <span style="color:var(--muted2);font-family:var(--mono);">XML RSS</span>
           </div>
           <div style="background:var(--bg3);border-radius:var(--radius);padding:8px 10px;font-size:9px;display:flex;justify-content:space-between;align-items:center;">
             <span><strong style="color:#e60023;">📌 Pinterest</strong> — pinterest.com/resource/BoardFeedResource/get/</span>
@@ -1690,7 +2333,7 @@ function showScannerArchitecture() {
         <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:4px;">🔥 En resumen</div>
         <div style="font-size:10px;color:var(--muted2);line-height:1.6;">
           El Viral Scanner es un <strong style="color:var(--accent);">sistema de inteligencia de contenidos</strong>
-          que aprende de 8 fuentes, observa señales de viralidad,
+          que aprende de 9 fuentes, observa señales de viralidad,
           recupera datos via proxies y CORS, y analiza todo
           con algoritmos de scoring. Todo desde el frontend,
           sin backend, usando JavaScript puro.
