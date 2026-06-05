@@ -1561,7 +1561,7 @@ function universalSearch(query) {
   if (typeof DORKS !== 'undefined') {
     DORKS.forEach(d => {
       if (results.length >= MAX) return;
-      if (d.name.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q) || (d.dork && d.dork.toLowerCase().includes(q))) {
+      if (d.name.toLowerCase().includes(q) || d.desc.toLowerCase().includes(q) || (d.dork && d.dork.toLowerCase().includes(q)) || (d.googleUrl && d.googleUrl.toLowerCase().includes(q))) {
         push({
           section: 'Dorking Engine', sectionIcon: '🔍',
           icon: '🔍', iconBg: '#1a1a2a', iconColor: 'var(--info-bright)',

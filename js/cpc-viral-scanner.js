@@ -22,11 +22,20 @@ let scannerState = {
   refreshInterval: null,
   sortBy: 'relevance',
   dateRange: '7d',
-  sourceFilter: 'all',
+  sourceFilters: {},
+  sourceFilterInit: false,
   enabledSources: JSON.parse(localStorage.getItem('na_enabled_sources') || '{}'),
 };
 
 // Ensure all SOURCES have an entry in enabledSources (default true)
+function initSourceFilters() {
+  if (scannerState.sourceFilterInit) return;
+  const s = scannerState.sourceFilters;
+  const allIds = SOURCES.map(x => x.id);
+  allIds.forEach(id => { s[id] = true; });
+  scannerState.sourceFilterInit = true;
+}
+
 function initEnabledSources() {
   const s = scannerState.enabledSources;
   const allIds = SOURCES.map(x => x.id);
@@ -80,12 +89,14 @@ const SOURCES = [
 
 // Initialize enabledSources defaults (must be after SOURCES is defined)
 initEnabledSources();
+initSourceFilters();
 
 /* ══════════════════════════════════════════════
    MAIN RENDER FUNCTION
    ══════════════════════════════════════════════ */
 
 function renderViralScanner() {
+  initSourceFilters();
   const container = document.getElementById('cpc-tab-content') || document.getElementById('cpc-container');
   if (!container) return;
 
@@ -208,7 +219,7 @@ function renderViralScanner() {
     <!-- ═══ SOURCE STATUS ═══ -->
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:14px;" id="scanner-source-status">
       ${SOURCES.map(s => `
-        <div class="scanner-source-card" id="scanner-source-${s.id}" onclick="filterBySource('${s.id}')" style="cursor:pointer;position:relative;">
+        <div class="scanner-source-card" id="scanner-source-${s.id}" onclick="toggleSourceFilter('${s.id}')" style="cursor:pointer;position:relative;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div style="font-size:20px;margin-bottom:2px;">${s.icon}</div>
             <label onclick="event.stopPropagation()" title="${scannerState.enabledSources[s.id] ? 'Desactivar' : 'Activar'} ${s.name}"
@@ -286,6 +297,28 @@ function renderViralScanner() {
       </div>
     </div>
 
+    <!-- ═══ SOURCE FILTER CHECKBOXES ═══ -->
+    <div id="scanner-filter-panel" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px;padding:8px 10px;background:var(--bg2);border:0.5px solid var(--border);border-radius:8px;align-items:center;">
+      <span style="font-size:9px;color:var(--muted2);font-weight:500;margin-right:4px;white-space:nowrap;">📡 Filtrar:</span>
+      ${SOURCES.map(s => `
+        <label for="filter-source-${s.id}"
+          style="cursor:pointer;display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;font-size:10px;user-select:none;white-space:nowrap;
+            ${scannerState.sourceFilters && scannerState.sourceFilters[s.id] ? 'background:' + s.color + '18;border:0.5px solid ' + s.color + '44;' : 'background:var(--bg3);border:0.5px solid var(--border);'}
+            transition:all 0.15s;">
+          <input type="checkbox" id="filter-source-${s.id}"
+            ${scannerState.sourceFilters && scannerState.sourceFilters[s.id] ? 'checked' : ''}
+            onchange="toggleSourceFilter('${s.id}')"
+            style="width:12px;height:12px;cursor:pointer;accent-color:${s.color};margin:0;" />
+          <span style="font-size:11px;">${s.icon}</span>
+          <span style="font-size:9px;color:var(--text2);">${s.name}</span>
+        </label>
+      `).join('')}
+      <div style="margin-left:auto;display:flex;gap:4px;">
+        <button class="btn btn-xs btn-ghost" onclick="selectAllSourceFilters(true)" style="font-size:9px;padding:2px 8px;">✅ Todas</button>
+        <button class="btn btn-xs btn-ghost" onclick="selectAllSourceFilters(false)" style="font-size:9px;padding:2px 8px;">⏸️ Ninguna</button>
+      </div>
+    </div>
+
     <!-- ═══ RESULTS GRID ═══ -->
     <div id="scanner-results-container" style="min-height:200px;">
       ${totalResults === 0 ? `
@@ -360,7 +393,7 @@ async function startScannerScan() {
     if (!niche) { throw new Error('Nicho no encontrado'); }
 
     scannerState.scanResults = [];
-    scannerState.sourceFilter = 'all';
+    initSourceFilters();
     const results = [];
     const allSources = ['google-news', 'google-discover', 'reddit', 'youtube', 'twitter', 'tiktok', 'pinterest', 'instagram', 'linkedin', 'quora', 'medium'];
     let sourcesToScan = scannerState.activeSource === 'all' 
@@ -1409,23 +1442,28 @@ function calculateViralScore(result) {
    SOURCE FILTER — Filtra resultados existentes sin re-escanear
    ══════════════════════════════════════════════ */
 
-function filterBySource(sourceId) {
-  // Toggle: si ya está activo, limpiar filtro (mostrar todas)
-  if (scannerState.sourceFilter === sourceId) {
-    scannerState.sourceFilter = 'all';
-  } else {
-    scannerState.sourceFilter = sourceId;
-  }
+function toggleSourceFilter(sourceId) {
+  initSourceFilters();
+  // Toggle individual source filter
+  scannerState.sourceFilters[sourceId] = !scannerState.sourceFilters[sourceId];
   renderScannerResults();
   reRenderStats();
   
-  // Mostrar toast informativo
-  const source = SOURCES.find(s => s.id === scannerState.sourceFilter);
-  if (source) {
-    showScannerToast(`🔍 Mostrando solo resultados de ${source.icon} ${source.name}`);
-  } else if (scannerState.sourceFilter === 'all') {
-    showScannerToast('📊 Mostrando todas las fuentes');
+  const src = SOURCES.find(s => s.id === sourceId);
+  const count = Object.values(scannerState.sourceFilters).filter(Boolean).length;
+  if (scannerState.sourceFilters[sourceId]) {
+    showScannerToast(`🔍 ${src ? src.icon : ''} ${src ? src.name : sourceId} activado en filtro (${count} fuentes)`);
+  } else {
+    showScannerToast(`🔍 ${src ? src.icon : ''} ${src ? src.name : sourceId} desactivado en filtro (${count} fuentes)`);
   }
+}
+
+function selectAllSourceFilters(enabled) {
+  initSourceFilters();
+  SOURCES.forEach(s => { scannerState.sourceFilters[s.id] = enabled; });
+  renderScannerResults();
+  reRenderStats();
+  showScannerToast(enabled ? '📊 Mostrando todas las fuentes' : '🔍 Ocultando todas las fuentes');
 }
 
 /* ══════════════════════════════════════════════
@@ -1439,9 +1477,13 @@ function renderScannerResults() {
 
   let results = [...scannerState.scanResults];
 
-  // Filter by source filter (sin re-escanear, solo filtra resultados existentes)
-  if (scannerState.sourceFilter !== 'all') {
-    results = results.filter(r => r.source === scannerState.sourceFilter);
+  // Filter by source filters (multi-select checkboxes)
+  initSourceFilters();
+  const activeFilterSources = Object.entries(scannerState.sourceFilters)
+    .filter(([_, v]) => v).map(([k, _]) => k);
+  const allSourcesActive = activeFilterSources.length >= SOURCES.length;
+  if (!allSourcesActive && activeFilterSources.length > 0) {
+    results = results.filter(r => activeFilterSources.includes(r.source));
   } else if (scannerState.activeSource !== 'all') {
     // Si no hay filtro manual pero hay fuente activa del escaneo, usar esa
     results = results.filter(r => r.source === scannerState.activeSource);
@@ -1451,10 +1493,12 @@ function renderScannerResults() {
   const totalBeforeSearch = results.length;
 
   const searchInput = document.getElementById('scanner-search-input');
-  if (searchInput && searchInput.value.trim()) {
-    const q = searchInput.value.toLowerCase().trim();
+  const rawSearchTerm = searchInput && searchInput.value.trim() ? searchInput.value.trim() : '';
+  if (rawSearchTerm) {
+    const q = rawSearchTerm.toLowerCase();
     results = results.filter(r => 
       r.title.toLowerCase().includes(q) || 
+      r.url?.toLowerCase().includes(q) ||
       r.snippet?.toLowerCase().includes(q) ||
       r.nicheName.toLowerCase().includes(q) ||
       r.sourceName.toLowerCase().includes(q) ||
@@ -1481,15 +1525,18 @@ function renderScannerResults() {
   if (countEl) {
     const searchInput = document.getElementById('scanner-search-input');
     const hasSearch = searchInput && searchInput.value.trim().length > 0;
-    const hasSourceFilter = scannerState.sourceFilter !== 'all';
+    initSourceFilters();
+    const activeFilterSources = Object.entries(scannerState.sourceFilters)
+      .filter(([_, v]) => v).map(([k, _]) => k);
+    const hasSourceFilter = !(activeFilterSources.length >= SOURCES.length);
     
     if (hasSourceFilter) {
-      const src = SOURCES.find(s => s.id === scannerState.sourceFilter);
       const totalAll = scannerState.scanResults.length;
+      const count = activeFilterSources.length;
       if (hasSearch) {
-        countEl.textContent = `(${results.length} de ${totalBeforeSearch} · ${src ? src.icon : ''} ${src ? src.name : ''})`;
+        countEl.textContent = `(${results.length} de ${totalBeforeSearch} · ${count}/${SOURCES.length} fuentes)`;
       } else {
-        countEl.textContent = `(${results.length} de ${totalAll} · ${src ? src.icon : ''} ${src ? src.name : ''})`;
+        countEl.textContent = `(${results.length} de ${totalAll} · ${count}/${SOURCES.length} fuentes)`;
       }
     } else if (hasSearch) {
       countEl.textContent = `(${results.length} de ${totalBeforeSearch} resultados)`;
@@ -1518,7 +1565,7 @@ function renderScannerResults() {
         <div style="display:flex;align-items:flex-start;gap:8px;">
           <span style="font-size:18px;flex-shrink:0;margin-top:1px;">${r.sourceIcon}</span>
           <div style="flex:1;min-width:0;">
-            <div style="font-size:12px;font-weight:500;color:var(--text2);line-height:1.4;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${r.title}</div>
+            <div style="font-size:12px;font-weight:500;color:var(--text2);line-height:1.4;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${rawSearchTerm ? highlightTerm(r.title, rawSearchTerm) : r.title}</div>
             <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:9px;">
               <span style="color:${sourceColor};">${r.sourceName}</span>
               <span style="color:var(--muted2);">·</span>
@@ -1526,7 +1573,7 @@ function renderScannerResults() {
               <span style="color:var(--muted2);">·</span>
               <span style="color:var(--accent);">${r.engagement.toLocaleString('en-US')} interactions</span>
             </div>
-            ${r.sourceDetail ? `<div style="font-size:8px;color:var(--muted2);margin-top:2px;">${r.sourceDetail}</div>` : ''}
+            ${r.sourceDetail ? `<div style="font-size:8px;color:var(--muted2);margin-top:2px;">${rawSearchTerm ? highlightTerm(r.sourceDetail, rawSearchTerm) : r.sourceDetail}</div>` : ''}
           </div>
           <div style="text-align:right;flex-shrink:0;">
             <div style="font-size:10px;font-weight:600;color:${viralColor};">${viralLabel}</div>
@@ -1554,6 +1601,14 @@ function clearScannerSearch() {
     input.focus();
   }
   renderScannerResults();
+}
+
+/* ── Highlight search terms in result text ── */
+function highlightTerm(text, term) {
+  if (!term || !text) return text;
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp('(' + escaped + ')', 'gi');
+  return text.replace(regex, '<mark style="background:var(--accent);color:var(--bg);padding:0 3px;border-radius:3px;font-weight:600;">$1</mark>');
 }
 
 /* ══════════════════════════════════════════════
@@ -1677,15 +1732,16 @@ function reRenderStats() {
       statusEl.innerHTML = count > 0 ? `✅ ${count} resultados` : '⏸️ Inactivo';
     }
     
-    // Highlight source filter active state
+    // Highlight source filter active state (multi-select)
+    initSourceFilters();
     const card = document.getElementById(`scanner-source-${s.id}`);
     if (card) {
-      const isActive = scannerState.sourceFilter === s.id;
+      const isActive = scannerState.sourceFilters[s.id];
       card.style.borderColor = isActive ? s.color : '';
       card.style.background = isActive ? `${s.color}12` : '';
       card.style.boxShadow = isActive ? `0 0 12px ${s.color}30` : '';
       card.style.transform = isActive ? 'scale(1.03)' : '';
-      card.title = isActive ? `Haz clic para mostrar todas las fuentes` : `Filtrar solo ${s.name}`;
+      card.title = isActive ? `Haz clic para desactivar ${s.name} del filtro` : `Haz clic para activar ${s.name} en filtro`;
     }
   });
 }
