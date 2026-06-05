@@ -73,6 +73,19 @@
         <span class="topo-bar-title" id="topbar-title">Dashboard</span>
         <span class="topo-bar-breadcrumb" id="topbar-breadcrumb">Resumen general</span>
       </div>
+      <div class="topbar-center">
+        <div class="universal-search" id="universal-search">
+          <span class="us-icon">🔍</span>
+          <input type="text" class="us-input" id="us-input"
+            placeholder="Buscar en toda la app..."
+            oninput="universalSearch(this.value)"
+            onfocus="universalSearch(this.value)"
+            onkeydown="if(event.key==='Escape')closeUniversalSearch()"
+            autocomplete="off" />
+          <button class="us-clear" id="us-clear" onclick="clearUniversalSearch()" style="display:none;">✕</button>
+          <div class="us-dropdown" id="us-dropdown"></div>
+        </div>
+      </div>
       <div class="topbar-right">
         <span id="topbar-status" style="font-size:11px;color:var(--muted);"></span>
       </div>

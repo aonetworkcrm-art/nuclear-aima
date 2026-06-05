@@ -1407,6 +1407,247 @@ function changeAppPassword() {
 }
 
 /* ══════════════════════════════════════════════
+   UNIVERSAL SEARCH — Busca en toda la app
+   ══════════════════════════════════════════════ */
+
+function universalSearch(query) {
+  const dropdown = document.getElementById('us-dropdown');
+  const clearBtn = document.getElementById('us-clear');
+  const q = query.trim().toLowerCase();
+
+  // Show/hide clear button
+  if (clearBtn) {
+    clearBtn.style.display = q.length > 0 ? 'flex' : 'none';
+  }
+
+  if (!q || q.length < 2) {
+    if (dropdown) dropdown.classList.remove('open');
+    return;
+  }
+
+  const results = [];
+
+  // ── 1. Buscar en CPC Nichos ──
+  if (typeof CPC_NICHES !== 'undefined') {
+    CPC_NICHES.forEach(n => {
+      if (results.length >= 40) return;
+      const matchName = n.name.toLowerCase().includes(q);
+      const matchKeywords = n.keywords.toLowerCase().includes(q);
+      const matchCat = n.cat.toLowerCase().includes(q);
+      const matchAngles = n.contentAngles.toLowerCase().includes(q);
+      if (matchName || matchKeywords || matchCat || matchAngles) {
+        const sub = matchCat ? '📊 ' + n.cat : '🔑 ' + n.keywords.substring(0, 60);
+        results.push({
+          section: 'CPC - Nichos',
+          sectionIcon: '📊',
+          icon: n.icon,
+          iconBg: '#2a1a0a',
+          iconColor: '#f0c040',
+          title: n.name,
+          subtitle: sub.substring(0, 80),
+          action: function() { navigateTo('cpc'); switchCPCTab('research'); showNicheDetail(n.id); },
+          sectionBadge: 'CPC',
+          badgeColor: 'var(--accent)'
+        });
+      }
+    });
+  }
+
+  // ── 2. Buscar en Master Plan ──
+  if (typeof MASTER_SECTIONS !== 'undefined') {
+    MASTER_SECTIONS.forEach(s => {
+      if (results.length >= 40) return;
+      const matchTitle = s.title.toLowerCase().includes(q);
+      const matchSub = s.subtitle.toLowerCase().includes(q);
+      const matchContent = s.content && s.content.toLowerCase().includes(q);
+      if (matchTitle || matchSub || matchContent) {
+        results.push({
+          section: 'Master Plan',
+          sectionIcon: '📚',
+          icon: s.icon,
+          iconBg: s.iconBg || '#1a1a2a',
+          iconColor: s.iconColor || '#c9a96e',
+          title: s.title.replace(/\d+\.\s*/, '').substring(0, 60),
+          subtitle: s.subtitle,
+          action: function() { navigateTo('masterplan'); navigateMasterSection(s.id); },
+          sectionBadge: 'Plan',
+          badgeColor: 'var(--success)'
+        });
+      }
+    });
+  }
+
+  // ── 3. Buscar en el Catálogo de Canciones ──
+  if (typeof ALL_CATALOG_SONGS !== 'undefined') {
+    const songs = getAllCatalogSongs();
+    songs.forEach(s => {
+      if (results.length >= 40) return;
+      if (s.name.toLowerCase().includes(q)) {
+        results.push({
+          section: 'Catálogo',
+          sectionIcon: '💿',
+          icon: '🎵',
+          iconBg: '#0a2a1a',
+          iconColor: '#2ecc71',
+          title: s.name,
+          subtitle: (s.catalogName || s.catalogId) + ' · ' + (s.views || 0).toLocaleString('en-US') + ' vistas',
+          action: function() { navigateTo('dashboard'); document.getElementById('dash-catalog-card')?.scrollIntoView({behavior:'smooth'}); catalogFilter=s.catalogId;renderFullCatalog(); },
+          sectionBadge: 'Canción',
+          badgeColor: 'var(--success-bright)'
+        });
+      }
+    });
+  }
+
+  // ── 4. Buscar en CPC tabs ──
+  if (typeof CPC_TABS !== 'undefined') {
+    CPC_TABS.forEach(t => {
+      if (results.length >= 40) return;
+      if (t.label.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)) {
+        results.push({
+          section: 'CPC Investigator',
+          sectionIcon: '📊',
+          icon: t.icon,
+          iconBg: '#1a1a2a',
+          iconColor: t.color,
+          title: t.label,
+          subtitle: t.desc,
+          action: function() { navigateTo('cpc'); switchCPCTab(t.id); },
+          sectionBadge: 'Herramienta',
+          badgeColor: 'var(--info-bright)'
+        });
+      }
+    });
+  }
+
+  // ── 5. Buscar en secciones de navegación ──
+  const navSections = [
+    { id: 'dashboard', icon: '📊', name: 'Dashboard', desc: 'Resumen general del sistema' },
+    { id: 'masterplan', icon: '📚', name: 'Master Plan', desc: 'Manual Maestro de Infraestructura Digital' },
+    { id: 'cotizador', icon: '💰', name: 'Cotizador', desc: 'Scaling Flow IA · Servicios Instagram' },
+    { id: 'nodeauditor', icon: '🕸️', name: 'Node Auditor', desc: 'Auditoría Forense de Nodos Musicales' },
+    { id: 'cpc', icon: '📊', name: 'CPC Investigator', desc: 'Análisis de Nichos de Alto CPC' },
+    { id: 'tools', icon: '🛠️', name: 'Herramientas', desc: 'Shadow Audit · Copy Generator' },
+    { id: 'admin', icon: '⚙️', name: 'Admin', desc: 'Configuración del sistema' },
+  ];
+  navSections.forEach(ns => {
+    if (results.length >= 40) return;
+    if (ns.name.toLowerCase().includes(q) || ns.desc.toLowerCase().includes(q)) {
+      results.push({
+        section: 'Navegación',
+        sectionIcon: '📍',
+        icon: ns.icon,
+        iconBg: '#1a1a2a',
+        iconColor: '#7db8e8',
+        title: ns.name,
+        subtitle: ns.desc,
+        action: function() { navigateTo(ns.id); },
+        sectionBadge: 'Ir',
+        badgeColor: 'var(--muted)'
+      });
+    }
+  });
+
+  // ── 6. Buscar en Herramientas (Tools) ──
+  const toolsItems = [
+    { name: 'Shadow Audit', desc: 'Auditoría de catálogos musicales', icon: '🛠️' },
+    { name: 'Copy Generator', desc: 'Generación de textos de marketing', icon: '✍️' },
+  ];
+  toolsItems.forEach(t => {
+    if (results.length >= 40) return;
+    if (t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)) {
+      results.push({
+        section: 'Herramientas',
+        sectionIcon: '🛠️',
+        icon: t.icon,
+        iconBg: '#1a1a2a',
+        iconColor: '#5c8ce0',
+        title: t.name,
+        subtitle: t.desc,
+        action: function() { navigateTo('tools'); },
+        sectionBadge: 'Tool',
+        badgeColor: 'var(--info)'
+      });
+    }
+  });
+
+  // ── Store actions in global array to preserve closure context ──
+  if (!window._usActions) window._usActions = [];
+  window._usActions.length = 0;
+
+  // ── Render dropdown ──
+  if (!dropdown) return;
+
+  if (results.length === 0) {
+    dropdown.innerHTML = '<div class="us-dropdown-empty">🔍 No se encontraron resultados para "' + query + '"</div>';
+    dropdown.classList.add('open');
+    return;
+  }
+
+  // Group by section
+  const groups = {};
+  results.forEach(r => {
+    if (!groups[r.section]) {
+      groups[r.section] = { icon: r.sectionIcon, items: [] };
+    }
+    groups[r.section].items.push(r);
+  });
+
+  let html = '';
+  const sectionKeys = Object.keys(groups);
+  sectionKeys.forEach((s, si) => {
+    const group = groups[s];
+    html += '<div class="us-dropdown-group">';
+    html += '<div class="us-group-label">' + group.icon + ' ' + s + ' (' + group.items.length + ')</div>';
+    group.items.forEach(r => {
+      // Highlight matching text
+      const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+      const hlTitle = r.title.replace(re, '<span class="us-highlight">$1</span>');
+      const hlSub = r.subtitle.replace(re, '<span class="us-highlight">$1</span>');
+            const actionIdx = window._usActions.length;
+      window._usActions.push(r.action);
+      html += '<div class="us-result-item" onclick="closeUniversalSearch();window._usActions[' + actionIdx + ']()">';
+      html += '  <div class="us-result-icon" style="background:' + r.iconBg + ';color:' + r.iconColor + ';">' + r.icon + '</div>';
+      html += '  <div class="us-result-text">';
+      html += '    <div class="us-result-title">' + hlTitle + '</div>';
+      html += '    <div class="us-result-sub">' + hlSub + '</div>';
+      html += '  </div>';
+      html += '  <span class="us-section-badge" style="background:' + (r.badgeColor || 'var(--bg4)') + '22;color:' + (r.badgeColor || 'var(--muted2)') + ';">' + r.sectionBadge + '</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<div style="padding:6px 12px;font-size:9px;color:var(--muted2);text-align:center;border-top:0.5px solid var(--border);">' + results.length + ' resultado' + (results.length !== 1 ? 's' : '') + ' · Presiona Escape para cerrar</div>';
+
+  dropdown.innerHTML = html;
+  dropdown.classList.add('open');
+}
+
+function closeUniversalSearch() {
+  const dropdown = document.getElementById('us-dropdown');
+  if (dropdown) dropdown.classList.remove('open');
+}
+
+function clearUniversalSearch() {
+  const input = document.getElementById('us-input');
+  const dropdown = document.getElementById('us-dropdown');
+  const clearBtn = document.getElementById('us-clear');
+  if (input) { input.value = ''; input.focus(); }
+  if (dropdown) dropdown.classList.remove('open');
+  if (clearBtn) clearBtn.style.display = 'none';
+}
+
+// Close search on click outside
+document.addEventListener('click', function(e) {
+  const search = document.getElementById('universal-search');
+  const dropdown = document.getElementById('us-dropdown');
+  if (search && dropdown && !search.contains(e.target)) {
+    dropdown.classList.remove('open');
+  }
+});
+
+/* ══════════════════════════════════════════════
    SHORTS DASHBOARD — Métricas Agregadas
    ══════════════════════════════════════════════ */
 
