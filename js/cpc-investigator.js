@@ -15,6 +15,7 @@ const CPC_TABS = [
   { id: 'scanner', icon: '🤖', label: 'Viral Scanner', color: 'var(--danger)', desc: 'Bot/scraper en vivo · Google News · Reddit · YouTube' },
   { id: 'seo', icon: '✍️', label: 'SEO Content', color: 'var(--success-bright)', desc: 'Generador automático de contenido SEO · Títulos · H2 · H3 · FAQ' },
   { id: 'blogger', icon: '📅', label: 'Blogger Scheduler', color: 'var(--info-bright)', desc: 'Planificador de publicaciones · Calendario · Notificaciones' },
+  { id: 'livesearch', icon: '🌐', label: 'Live Search', color: 'var(--danger)', desc: 'Búsqueda web en tiempo real · Encuentra contenido fresco sobre cualquier tema' },
 ];
 
 /* ── MAIN RENDER: Tab Orquestador ── */
@@ -94,6 +95,8 @@ function renderActiveTab() {
     renderSEOGenerator();
   } else if (cpcActiveTab === 'blogger') {
     renderBloggerScheduler();
+  } else if (cpcActiveTab === 'livesearch') {
+    renderLiveSearch();
   }
 }
 
@@ -1250,4 +1253,371 @@ function showCPCToast(msg) {
   cpcToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
 }
 
-console.log('📊 CPC Investigator v2.0 loaded — ' + CPC_NICHES.length + ' nichos · 3 módulos integrados');
+/* ══════════════════════════════════════════════
+   LIVE SEARCH — Búsqueda web en tiempo real
+   ══════════════════════════════════════════════ */
+
+let liveSearchState = {
+  query: '',
+  results: [],
+  loading: false,
+  source: '',
+  searchType: 'text', // 'text' | 'news'
+  totalResults: 0,
+  error: null,
+  savedResults: JSON.parse(localStorage.getItem('na_live_search_saved') || '[]'),
+  analyzedDomains: {} // cache: { domain: { da, traffic, cpc, yield, ... } }
+};
+
+function renderLiveSearch() {
+  const container = document.getElementById('cpc-tab-content');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <!-- ═══ SEARCH AREA ═══ -->
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius2);padding:20px;">
+        <div style="display:flex;gap:10px;align-items:flex-end;">
+          <div class="form-group" style="flex:1;margin:0;">
+            <label style="font-size:11px;color:var(--muted2);">🌐 Busca cualquier tema en la web</label>
+            <div style="display:flex;gap:6px;margin-top:4px;">
+              <input type="text" id="ls-input"
+                placeholder="Ej: cómo preparar café artesanal, beneficios del arroz integral, técnicas de lectura rápida..."
+                value="${liveSearchState.query}"
+                onkeydown="if(event.key==='Enter')runLiveSearch()"
+                style="flex:1;background:var(--bg3);border:0.5px solid var(--border);border-radius:var(--radius);padding:10px 14px;color:var(--text);font-size:13px;font-family:var(--font);outline:none;" />
+              <button class="btn btn-primary" onclick="runLiveSearch()" id="ls-search-btn" style="padding:10px 20px;">
+                🔍 Buscar
+              </button>
+            </div>
+          </div>
+          <div style="display:flex;gap:4px;align-items:flex-end;margin-bottom:1px;">
+            <button class="btn btn-xs ${liveSearchState.searchType === 'text' ? 'btn-primary' : 'btn-ghost'}" 
+              onclick="liveSearchState.searchType='text';renderLiveSearch();runLiveSearch()"
+              style="font-size:10px;padding:4px 10px;">🌐 Web</button>
+            <button class="btn btn-xs ${liveSearchState.searchType === 'news' ? 'btn-primary' : 'btn-ghost'}" 
+              onclick="liveSearchState.searchType='news';renderLiveSearch();runLiveSearch()"
+              style="font-size:10px;padding:4px 10px;">📰 Noticias</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;font-size:10px;color:var(--muted2);display:flex;justify-content:space-between;">
+          <span>💡 Busca contenido fresco sobre cualquier tema para tus blogs, posts o investigación</span>
+          <span id="ls-source-badge"></span>
+        </div>
+      </div>
+
+      <!-- ═══ LOADING / STATUS ═══ -->
+      <div id="ls-status" style="${liveSearchState.loading ? '' : 'display:none;'}text-align:center;padding:30px;color:var(--muted);">
+        <div style="font-size:24px;margin-bottom:8px;">⏳</div>
+        <div style="font-size:13px;">Buscando en la web...</div>
+      </div>
+
+      <!-- ═══ ERROR ═══ -->
+      <div id="ls-error" style="${liveSearchState.error ? '' : 'display:none;'}background:rgba(224,92,92,0.08);border:0.5px solid rgba(224,92,92,0.2);border-radius:var(--radius);padding:12px 16px;font-size:12px;color:var(--danger);">
+        ${liveSearchState.error || ''}
+      </div>
+
+      <!-- ═══ RESULTS ═══ -->
+      <div id="ls-results">
+        ${liveSearchState.results.length === 0 && !liveSearchState.loading ? `
+          <div style="text-align:center;padding:50px 20px;background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius2);">
+            <div style="font-size:48px;margin-bottom:12px;">🌐</div>
+            <h3 style="font-size:16px;font-weight:500;margin-bottom:6px;color:var(--text);">Búsqueda Web en Vivo</h3>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:4px;">Escribe cualquier tema y obtén resultados frescos de la web</p>
+            <p style="font-size:11px;color:var(--muted2);">
+              ${liveSearchState.query 
+              ? 'Presiona Enter o haz clic en Buscar para encontrar contenido fresco' 
+              : 'Ejemplos: café artesanal · arroz integral · lectura rápida · marketing digital · SEO 2026'}
+            </p>
+            ${!liveSearchState.query ? `
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ls-input').value='café artesanal beneficios';runLiveSearch()" style="font-size:11px;">☕ Café artesanal</button>
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ls-input').value='arroz integral propiedades';runLiveSearch()" style="font-size:11px;">🍚 Arroz integral</button>
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ls-input').value='técnicas de lectura rápida';runLiveSearch()" style="font-size:11px;">📖 Lectura rápida</button>
+              <button class="btn btn-sm btn-ghost" onclick="document.getElementById('ls-input').value='ideas para blog de nicho 2026';runLiveSearch()" style="font-size:11px;">✍️ Ideas para blog</button>
+            </div>` : ''}
+          </div>
+        ` : renderLiveSearchResults()}
+      </div>
+    </div>
+  `;
+
+  // Update source badge
+  const badgeEl = document.getElementById('ls-source-badge');
+  if (badgeEl && liveSearchState.source) {
+    if (liveSearchState.source === 'duckduckgo') {
+      badgeEl.innerHTML = '<span style="padding:2px 8px;border-radius:4px;background:rgba(76,173,124,0.15);color:var(--success);font-weight:500;font-size:10px;">🦆 DuckDuckGo · Resultados reales</span>';
+    } else if (liveSearchState.source === 'none') {
+      badgeEl.innerHTML = '<span style="padding:2px 8px;border-radius:4px;background:rgba(224,92,92,0.15);color:var(--danger);font-weight:500;font-size:10px;">❌ Sin conexión</span>';
+    }
+  }
+}
+
+function lsRenderForensic(keywords, contentAngles) {
+  if ((!keywords || keywords.length === 0) && (!contentAngles || contentAngles.length === 0)) {
+    return '';
+  }
+  let html = '<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">';
+  if (keywords && keywords.length > 0) {
+    html += keywords.slice(0, 4).map(k =>
+      '<span style="font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(201,169,110,0.12);color:var(--accent);">🔑 ' + k + '</span>'
+    ).join('');
+  }
+  if (contentAngles && contentAngles.length > 0) {
+    html += '<span style="font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(76,173,124,0.1);color:var(--success);">📝 +' + contentAngles.length + ' ángulos</span>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderLiveSearchResults() {
+  if (!liveSearchState.results || liveSearchState.results.length === 0) return '';
+  
+  // Wrap en try/catch para que NUNCA pueda romper el render principal
+  try {
+    const query = liveSearchState.query;
+    const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp('(' + escapedQuery + ')', 'gi');
+    
+    const resultsHtml = liveSearchState.results.map((r, i) => {
+      // Proteccion contra datos inesperados
+      const safeTitle = typeof r.title === 'string' ? r.title : '';
+      const safeUrl = (typeof r.url === 'string' && r.url) ? r.url : '#';
+      const safeSnippet = typeof r.snippet === 'string' ? r.snippet : '';
+      const safeSource = typeof r.source === 'string' ? r.source : '';
+      
+      const hlTitle = safeTitle ? safeTitle.replace(re, '<mark style="background:var(--accent);color:var(--bg);padding:0 3px;border-radius:3px;font-weight:600;">$1</mark>') : safeTitle;
+      const hlSnippet = safeSnippet ? safeSnippet.replace(re, '<mark style="background:var(--accent);color:var(--bg);padding:0 3px;border-radius:3px;font-weight:600;">$1</mark>') : safeSnippet;
+      const domain = safeUrl ? extractDomain(safeUrl) : safeSource || '';
+      const keywords = Array.isArray(r.keywords) ? r.keywords : [];
+      const contentAngles = Array.isArray(r.contentAngles) ? r.contentAngles : [];
+      
+      return `
+        <div style="background:var(--bg2);padding:14px 16px;transition:background 0.1s;cursor:pointer;"
+          onmouseover="this.style.background='var(--bg3)'" onmouseout="this.style.background='var(--bg2)'"
+          onclick="window.open('${safeUrl.replace(/'/g, "\\'")}','_blank')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:14px;font-weight:600;color:var(--info-bright);margin-bottom:2px;line-height:1.3;">
+                ${hlTitle || safeTitle}
+              </div>
+              <div style="font-size:11px;color:var(--muted2);margin-bottom:4px;">
+                <span style="color:var(--success-bright);">${domain}</span>
+                ${safeSource && safeSource !== domain ? ' · <span>' + safeSource + '</span>' : ''}
+                ${r.date ? ' · <span style="color:var(--muted);">' + r.date + '</span>' : ''}
+              </div>
+              <div style="font-size:12px;color:var(--text2);line-height:1.5;margin-bottom:${keywords.length || contentAngles.length ? '8' : '0'}px;">
+                ${hlSnippet || safeSnippet || ''}
+              </div>
+              ${lsRenderForensic(keywords, contentAngles)}
+            </div>
+            <div style="font-size:11px;color:var(--muted2);white-space:nowrap;flex-shrink:0;padding-top:2px;display:flex;flex-direction:column;gap:3px;align-items:flex-end;">
+              <span style="padding:2px 8px;border-radius:4px;background:var(--bg4);font-size:10px;">#${i + 1}</span>
+              <button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();analyzeDomainNode(${i})" style="font-size:9px;padding:1px 5px;" title="Analizar potencia y yield del dominio">⚡</button>
+              <button class="btn btn-xs btn-ghost" onclick="event.stopPropagation();saveSearchResult(${i})" style="font-size:9px;padding:1px 5px;" title="Guardar resultado">💾</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius2);overflow:hidden;">
+        <!-- Stats bar -->
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:var(--bg3);border-bottom:0.5px solid var(--border);">
+          <div style="font-size:12px;color:var(--muted2);">
+            🔍 <strong style="color:var(--text);">${liveSearchState.totalResults}</strong> resultados para 
+            <strong style="color:var(--accent);">"${query}"</strong>
+            ${liveSearchState.searchType === 'news' ? '<span style="margin-left:8px;font-size:10px;padding:2px 6px;border-radius:4px;background:rgba(224,92,92,0.15);color:var(--danger);">📰 Noticias</span>' : ''}
+          </div>
+          <div style="display:flex;gap:4px;">
+            <button class="btn btn-xs btn-ghost" onclick="openResultsAsList()" style="font-size:10px;" title="Ver como lista">📋 Lista</button>
+            <button class="btn btn-xs btn-ghost" onclick="copySearchResults()" style="font-size:10px;">📋 Copiar</button>
+            <button class="btn btn-xs btn-ghost" onclick="showSearchHistory()" style="font-size:10px;" title="Historial de búsquedas guardadas" id="ls-history-btn">📚 (${liveSearchState.savedResults.length})</button>
+          </div>
+        </div>
+
+        <!-- Result grid -->
+        <div style="display:grid;gap:1px;background:var(--border);">
+          ${resultsHtml}
+        </div>
+      </div>
+    `;
+  } catch (e) {
+    console.error('renderLiveSearchResults() CRASH:', e);
+    // Fallback: mostrar mensaje de error en lugar de romper todo
+    return `<div style="padding:20px;background:rgba(224,92,92,0.06);border:0.5px solid rgba(224,92,92,0.15);border-radius:var(--radius);">
+      <div style="font-size:12px;color:var(--danger);">❌ Error interno al renderizar resultados: ${e.message}</div>
+      <div style="font-size:10px;color:var(--muted2);margin-top:4px;">Revisa la consola (F12) para el stacktrace completo</div>
+    </div>`;
+  }
+}
+
+/* ── Live Search Execution ── */
+async function runLiveSearch() {
+  const input = document.getElementById('ls-input');
+  const query = input?.value.trim();
+  if (!query) {
+    showCPCToast('✍️ Escribe algo para buscar');
+    return;
+  }
+
+  liveSearchState.query = query;
+  liveSearchState.loading = true;
+  liveSearchState.error = null;
+  liveSearchState.results = [];
+  renderLiveSearch();
+  
+  // Re-focus input after re-render
+  setTimeout(() => document.getElementById('ls-input')?.focus(), 50);
+
+  try {
+    // Try backend - detect the right API base
+    const type = liveSearchState.searchType || 'text';
+    // Try multiple API endpoints in order
+    const apiCandidates = [
+      window.API_BASE || '',
+      'http://localhost:5555',
+      'http://localhost:5000',
+      ''
+    ];
+    // Remove duplicates
+    const seen = new Set();
+    const uniqueApis = apiCandidates.filter(url => {
+      const key = url || 'empty';
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    
+    let data = null;
+    let lastError = null;
+    
+    for (const apiBase of uniqueApis) {
+      try {
+        const url = apiBase + '/api/web-search?q=' + encodeURIComponent(query) + '&max_results=30&type=' + type;
+        const resp = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!resp.ok) {
+          lastError = new Error('HTTP ' + resp.status);
+          continue;
+        }
+        data = await resp.json();
+        if (data && data.status === 'success' && data.source !== 'demo') {
+          break; // Real results found!
+        }
+        if (data && data.status === 'success') {
+          // Got demo data - keep trying but save as fallback
+          if (!data.source || data.source === 'demo') {
+            lastError = new Error('Solo datos demo disponibles');
+            continue;
+          }
+          break;
+        }
+      } catch (e) {
+        lastError = e;
+        continue;
+      }
+    }
+    
+    if (data && data.status === 'success' && data.source !== 'demo') {
+      liveSearchState.results = data.results || [];
+      liveSearchState.totalResults = data.total || data.results.length;
+      liveSearchState.source = data.source || 'duckduckgo';
+      liveSearchState.error = null;
+    } else if (data && data.status === 'success') {
+      // Got demo data from all sources
+      liveSearchState.results = data.results || [];
+      liveSearchState.totalResults = data.total || data.results.length;
+      liveSearchState.source = 'demo';
+      liveSearchState.error = '⚠️ Backend conectado pero DuckDuckGo no disponible. Abre http://localhost:5555 en tu navegador para usar tu IP local.';
+    } else {
+      throw lastError || new Error('No se pudo conectar al backend');
+    }
+  } catch (e) {
+    console.warn('Live Search error:', e.message);
+    liveSearchState.error = '❌ No se pudo conectar a ningún motor de búsqueda. Verifica que el backend Flask esté corriendo en localhost:5555.';
+    liveSearchState.source = 'none';
+    liveSearchState.results = [];
+    liveSearchState.totalResults = 0;
+  }
+
+  // ── Render final (con proteccion contra errores que dejan la UI colgada) ──
+  liveSearchState.loading = false;
+  try {
+    renderLiveSearch();
+  } catch (renderError) {
+    console.error('Live Search render CRASH:', renderError);
+    // Si renderLiveSearch() falla, mostrar error en pantalla
+    const container = document.getElementById('cpc-tab-content');
+    if (container) {
+      container.innerHTML = `
+        <div style="padding:20px;background:rgba(224,92,92,0.08);border:0.5px solid rgba(224,92,92,0.2);border-radius:var(--radius);">
+          <div style="font-size:14px;color:var(--danger);margin-bottom:8px;">❌ Error al mostrar resultados</div>
+          <div style="font-size:11px;color:var(--muted2);font-family:var(--mono);">${renderError.message || 'Error desconocido'}</div>
+          <div style="font-size:11px;color:var(--muted2);margin-top:8px;">Revisa la consola del navegador (F12) para más detalles.</div>
+          <button class="btn btn-sm btn-ghost" onclick="renderLiveSearch()" style="margin-top:8px;font-size:11px;">🔄 Reintentar</button>
+        </div>
+      `;
+    }
+  }
+
+  // Re-focus input after re-render
+  setTimeout(() => document.getElementById('ls-input')?.focus(), 50);
+
+  // Smooth scroll to results
+  setTimeout(() => {
+    const resultsEl = document.getElementById('ls-results');
+    if (resultsEl) resultsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+/* ── Utility Functions ── */
+function extractDomain(url) {
+  try {
+    const u = new URL(url);
+    return u.hostname.replace('www.', '');
+  } catch {
+    return url || '';
+  }
+}
+
+function copySearchResults() {
+  const results = liveSearchState.results;
+  if (!results || results.length === 0) return;
+
+  let text = '🔍 Resultados de búsqueda: "' + liveSearchState.query + '"\n';
+  text += '═'.repeat(50) + '\n\n';
+  results.forEach((r, i) => {
+    text += (i + 1) + '. ' + r.title + '\n';
+    text += '   URL: ' + r.url + '\n';
+    text += '   ' + (r.snippet || '').substring(0, 200) + '\n\n';
+  });
+
+  navigator.clipboard.writeText(text).then(() => {
+    showCPCToast('✅ ' + results.length + ' resultados copiados al portapapeles');
+  }).catch(() => {
+    showCPCToast('⚠️ No se pudo copiar');
+  });
+}
+
+function openResultsAsList() {
+  const results = liveSearchState.results;
+  if (!results || results.length === 0) return;
+
+  let html = '<div style="font-size:12px;line-height:1.8;">';
+  results.forEach((r, i) => {
+    html += '<div style="padding:8px 0;border-bottom:0.5px solid var(--border);">';
+    html += '<div style="font-weight:600;color:var(--info-bright);">' + (i + 1) + '. ' + r.title + '</div>';
+    html += '<div style="font-size:11px;color:var(--muted2);">🔗 <a href="' + r.url + '" target="_blank" style="color:var(--accent);">' + r.url + '</a></div>';
+    html += '<div style="font-size:11px;color:var(--text2);margin-top:2px;">' + (r.snippet || '').substring(0, 300) + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  openModal('📋 Lista de Resultados — "' + liveSearchState.query + '"', html, `
+    <button class="btn btn-sm btn-ghost" onclick="closeModal()">Cerrar</button>
+    <button class="btn btn-sm btn-primary" onclick="copySearchResults()">📋 Copiar Todo</button>
+  `);
+}
+
+console.log('📊 CPC Investigator v2.0 loaded — ' + CPC_NICHES.length + ' nichos · Live Search integrado');
